@@ -79,3 +79,23 @@ export interface TournamentListResponse {
     totalPages: number;
   };
 }
+
+export const ApplicationStatus = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED',
+} as const;
+
+export type ApplicationStatus = typeof ApplicationStatus[keyof typeof ApplicationStatus];
+
+export interface TournamentApplication {
+  id: string;
+  tournamentId: string;
+  playerId: string;
+  applicationDate: string;
+  status: ApplicationStatus;
+  createdAt: string;
+  updatedAt: string;
+  player?: Player;
+  tournament?: Tournament;
+}

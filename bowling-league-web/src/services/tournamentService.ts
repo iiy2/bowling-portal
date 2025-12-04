@@ -6,6 +6,8 @@ import type {
   TournamentQueryParams,
   TournamentListResponse,
   TournamentStatus,
+  TournamentApplication,
+  TournamentParticipation,
 } from '../types/tournament';
 
 export const tournamentService = {
@@ -46,5 +48,31 @@ export const tournamentService = {
 
   deleteTournament: async (id: string): Promise<void> => {
     await api.delete(`/tournaments/${id}`);
+  },
+
+  // Tournament Applications
+  applyToTournament: async (tournamentId: string, playerId: string): Promise<TournamentApplication> => {
+    const response = await api.post<TournamentApplication>(`/tournaments/${tournamentId}/applications`, { playerId });
+    return response.data;
+  },
+
+  getApplications: async (tournamentId: string): Promise<TournamentApplication[]> => {
+    const response = await api.get<TournamentApplication[]>(`/tournaments/${tournamentId}/applications`);
+    return response.data;
+  },
+
+  approveApplication: async (tournamentId: string, applicationId: string): Promise<{ application: TournamentApplication; participation: TournamentParticipation }> => {
+    const response = await api.patch(`/tournaments/${tournamentId}/applications/${applicationId}/approve`);
+    return response.data;
+  },
+
+  rejectApplication: async (tournamentId: string, applicationId: string): Promise<TournamentApplication> => {
+    const response = await api.patch<TournamentApplication>(`/tournaments/${tournamentId}/applications/${applicationId}/reject`);
+    return response.data;
+  },
+
+  getParticipants: async (tournamentId: string): Promise<TournamentParticipation[]> => {
+    const response = await api.get<TournamentParticipation[]>(`/tournaments/${tournamentId}/participants`);
+    return response.data;
   },
 };

@@ -7,6 +7,8 @@ import {
 } from '../../hooks/useTournaments';
 import { useAuthStore } from '../../store/useAuthStore';
 import { TournamentStatus } from '../../types/tournament';
+import { TournamentRegistration } from '../../components/tournaments/TournamentRegistration';
+import { TournamentApplications } from '../../components/tournaments/TournamentApplications';
 
 export const TournamentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -231,6 +233,20 @@ export const TournamentDetailPage: React.FC = () => {
         </div>
 
         <div className="space-y-6">
+          {!isAdmin && tournament.status === TournamentStatus.UPCOMING && (
+            <TournamentRegistration
+              tournamentId={id!}
+              tournamentName={tournament.name}
+              isFull={
+                tournament.maxParticipants
+                  ? (tournament._count?.participations || 0) >= tournament.maxParticipants
+                  : false
+              }
+            />
+          )}
+
+          {isAdmin && <TournamentApplications tournamentId={id!} />}
+
           {isAdmin && (
             <div className="rounded-lg border border-border bg-card p-6">
               <h2 className="text-xl font-semibold text-foreground mb-4">

@@ -74,7 +74,11 @@ export class SeasonsService {
     }
 
     const season = await this.prisma.season.create({
-      data: seasonData,
+      data: {
+        ...seasonData,
+        startDate,
+        endDate,
+      },
       include: {
         ratingConfigurations: true,
       },

@@ -286,4 +286,184 @@ export class TournamentsService {
       },
     });
   }
+
+  // Tournament Applications
+  async applyToTournament(tournamentId: string, playerId: string, userId: string) {
+    // Verify tournament exists
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: tournamentId },
+      include: {
+        _count: {
+          select: {
+            participations: true,
+            applications: { where: { status: 'PENDING' } },
+          },
+        },
+      },
+    });
+
+    if (!tournament) {
+      throw new NotFoundException(`Tournament with ID ${tournamentId} not found`);
+    }
+
+    // Verify player exists and belongs to user
+    const player = await this.prisma.player.findUnique({
+      where: { id: playerId },
+    });
+
+    if (!player) {
+      throw new NotFoundException(`Player with ID ${playerId} not found`);
+    }
+
+    if (player.userId !== userId) {
+      throw new BadRequestException('You can only apply with your own players');
+    }
+
+    // Check if tournament is full
+    if (tournament.maxParticipants && tournament._count.participations >= tournament.maxParticipants) {
+      throw new BadRequestException('Tournament is full');
+    }
+
+    // Check if already applied or participating
+    const existingApplication = await this.prisma.tournamentApplication.findUnique({
+      where: {
+        tournamentId_playerId: {
+          tournamentId,
+          playerId,
+        },
+      },
+    });
+
+    if (existingApplication) {
+      throw new ConflictException('Player has already applied to this tournament');
+    }
+
+    const existingParticipation = await this.prisma.tournamentParticipation.findUnique({
+      where: {
+        tournamentId_playerId: {
+          tournamentId,
+          playerId,
+        },
+      },
+    });
+
+    if (existingParticipation) {
+      throw new ConflictException('Player is already participating in this tournament');
+    }
+
+    // Create application
+    const application = await this.prisma.tournamentApplication.create({
+      data: {
+        tournamentId,
+        playerId,
+      },
+      include: {
+        player: true,
+        tournament: true,
+      },
+    });
+
+    return application;
+  }
+
+  async getApplications(tournamentId: string) {
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: tournamentId },
+    });
+
+    if (!tournament) {
+      throw new NotFoundException(`Tournament with ID ${tournamentId} not found`);
+    }
+
+    return this.prisma.tournamentApplication.findMany({
+      where: { tournamentId },
+      include: {
+        player: true,
+      },
+      orderBy: { applicationDate: 'asc' },
+    });
+  }
+
+  async approveApplication(applicationId: string) {
+    const application = await this.prisma.tournamentApplication.findUnique({
+      where: { id: applicationId },
+      include: {
+        tournament: true,
+        player: true,
+      },
+    });
+
+    if (!application) {
+      throw new NotFoundException(`Application with ID ${applicationId} not found`);
+    }
+
+    if (application.status !== 'PENDING') {
+      throw new BadRequestException(`Application has already been ${application.status.toLowerCase()}`);
+    }
+
+    // Check if tournament is full
+    const participationCount = await this.prisma.tournamentParticipation.count({
+      where: { tournamentId: application.tournamentId },
+    });
+
+    if (application.tournament.maxParticipants && participationCount >= application.tournament.maxParticipants) {
+      throw new BadRequestException('Tournament is full');
+    }
+
+    // Update application status and create participation in a transaction
+    const [updatedApplication, participation] = await this.prisma.$transaction([
+      this.prisma.tournamentApplication.update({
+        where: { id: applicationId },
+        data: { status: 'APPROVED' },
+        include: { player: true },
+      }),
+      this.prisma.tournamentParticipation.create({
+        data: {
+          tournamentId: application.tournamentId,
+          playerId: application.playerId,
+        },
+        include: { player: true },
+      }),
+    ]);
+
+    return { application: updatedApplication, participation };
+  }
+
+  async rejectApplication(applicationId: string) {
+    const application = await this.prisma.tournamentApplication.findUnique({
+      where: { id: applicationId },
+    });
+
+    if (!application) {
+      throw new NotFoundException(`Application with ID ${applicationId} not found`);
+    }
+
+    if (application.status !== 'PENDING') {
+      throw new BadRequestException(`Application has already been ${application.status.toLowerCase()}`);
+    }
+
+    return this.prisma.tournamentApplication.update({
+      where: { id: applicationId },
+      data: { status: 'REJECTED' },
+      include: { player: true },
+    });
+  }
+
+  async getParticipants(tournamentId: string) {
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: tournamentId },
+    });
+
+    if (!tournament) {
+      throw new NotFoundException(`Tournament with ID ${tournamentId} not found`);
+    }
+
+    return this.prisma.tournamentParticipation.findMany({
+      where: { tournamentId },
+      include: {
+        player: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
 }

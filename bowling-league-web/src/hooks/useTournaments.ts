@@ -80,3 +80,59 @@ export const useDeleteTournament = () => {
     },
   });
 };
+
+// Tournament Applications
+export const useApplyToTournament = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ tournamentId, playerId }: { tournamentId: string; playerId: string }) =>
+      tournamentService.applyToTournament(tournamentId, playerId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['tournament', variables.tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['tournament-applications', variables.tournamentId] });
+    },
+  });
+};
+
+export const useTournamentApplications = (tournamentId: string) => {
+  return useQuery({
+    queryKey: ['tournament-applications', tournamentId],
+    queryFn: () => tournamentService.getApplications(tournamentId),
+    enabled: !!tournamentId,
+  });
+};
+
+export const useApproveApplication = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ tournamentId, applicationId }: { tournamentId: string; applicationId: string }) =>
+      tournamentService.approveApplication(tournamentId, applicationId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['tournament', variables.tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['tournament-applications', variables.tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['tournament-participants', variables.tournamentId] });
+    },
+  });
+};
+
+export const useRejectApplication = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ tournamentId, applicationId }: { tournamentId: string; applicationId: string }) =>
+      tournamentService.rejectApplication(tournamentId, applicationId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['tournament-applications', variables.tournamentId] });
+    },
+  });
+};
+
+export const useTournamentParticipants = (tournamentId: string) => {
+  return useQuery({
+    queryKey: ['tournament-participants', tournamentId],
+    queryFn: () => tournamentService.getParticipants(tournamentId),
+    enabled: !!tournamentId,
+  });
+};

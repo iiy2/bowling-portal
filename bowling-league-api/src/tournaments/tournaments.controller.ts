@@ -8,6 +8,7 @@ import {
   Delete,
   Query,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { TournamentsService } from './tournaments.service';
@@ -101,5 +102,66 @@ export class TournamentsController {
   @ApiResponse({ status: 409, description: 'Conflict - Tournament has participants' })
   remove(@Param('id') id: string) {
     return this.tournamentsService.remove(id);
+  }
+
+  // Tournament Applications endpoints
+  @Post(':id/applications')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Apply to tournament (authenticated users)' })
+  @ApiResponse({ status: 201, description: 'Application submitted successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error or tournament full' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Tournament not found' })
+  @ApiResponse({ status: 409, description: 'Conflict - already applied' })
+  applyToTournament(@Param('id') id: string, @Request() req: any, @Body('playerId') playerId: string) {
+    return this.tournamentsService.applyToTournament(id, playerId, req.user.userId);
+  }
+
+  @Get(':id/applications')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all applications for a tournament (Admin only)' })
+  @ApiResponse({ status: 200, description: 'List of applications' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
+  @ApiResponse({ status: 404, description: 'Tournament not found' })
+  getApplications(@Param('id') id: string) {
+    return this.tournamentsService.getApplications(id);
+  }
+
+  @Patch(':id/applications/:applicationId/approve')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Approve tournament application (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Application approved and participant created' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
+  @ApiResponse({ status: 404, description: 'Application not found' })
+  approveApplication(@Param('applicationId') applicationId: string) {
+    return this.tournamentsService.approveApplication(applicationId);
+  }
+
+  @Patch(':id/applications/:applicationId/reject')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Reject tournament application (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Application rejected' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
+  @ApiResponse({ status: 404, description: 'Application not found' })
+  rejectApplication(@Param('applicationId') applicationId: string) {
+    return this.tournamentsService.rejectApplication(applicationId);
+  }
+
+  @Get(':id/participants')
+  @ApiOperation({ summary: 'Get all participants for a tournament' })
+  @ApiResponse({ status: 200, description: 'List of participants' })
+  @ApiResponse({ status: 404, description: 'Tournament not found' })
+  getParticipants(@Param('id') id: string) {
+    return this.tournamentsService.getParticipants(id);
   }
 }
