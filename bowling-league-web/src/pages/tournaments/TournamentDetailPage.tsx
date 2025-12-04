@@ -1,0 +1,313 @@
+import React from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import {
+  useTournament,
+  useDeleteTournament,
+  useUpdateTournamentStatus,
+} from '../../hooks/useTournaments';
+import { useAuthStore } from '../../store/useAuthStore';
+import { TournamentStatus } from '../../types/tournament';
+
+export const TournamentDetailPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'ADMIN';
+
+  const { data: tournament, isLoading, error } = useTournament(id!);
+  const deleteTournament = useDeleteTournament();
+  const updateStatus = useUpdateTournamentStatus();
+
+  const handleDelete = () => {
+    if (!tournament) return;
+
+    if (
+      window.confirm(`Are you sure you want to delete tournament "${tournament.name}"?`)
+    ) {
+      deleteTournament.mutate(id!, {
+        onSuccess: () => {
+          navigate('/tournaments');
+        },
+      });
+    }
+  };
+
+  const handleStatusChange = (status: TournamentStatus) => {
+    if (!tournament) return;
+
+    updateStatus.mutate({ id: id!, status });
+  };
+
+  const getStatusBadgeColor = (status: TournamentStatus) => {
+    switch (status) {
+      case TournamentStatus.UPCOMING:
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
+      case TournamentStatus.ONGOING:
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
+      case TournamentStatus.COMPLETED:
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
+
+  const formatTime = (dateString: string) => {
+    return new Date(dateString).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <p className="text-muted-foreground">Loading tournament...</p>
+      </div>
+    );
+  }
+
+  if (error || !tournament) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <p className="text-destructive">Tournament not found</p>
+        <Link
+          to="/tournaments"
+          className="text-primary hover:text-primary/80 mt-4 inline-block"
+        >
+          Back to Tournaments
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="mb-8">
+        <Link
+          to="/tournaments"
+          className="text-primary hover:text-primary/80 text-sm mb-4 inline-block"
+        >
+          ← Back to Tournaments
+        </Link>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-foreground">{tournament.name}</h1>
+              <span
+                className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${getStatusBadgeColor(tournament.status)}`}
+              >
+                {tournament.status}
+              </span>
+            </div>
+            <p className="mt-2 text-muted-foreground">
+              {formatDate(tournament.date)} at {formatTime(tournament.date)}
+            </p>
+          </div>
+          {isAdmin && (
+            <div className="flex gap-3">
+              <Link
+                to={`/tournaments/${id}/edit`}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+              >
+                Edit
+              </Link>
+              <button
+                onClick={handleDelete}
+                disabled={deleteTournament.isPending}
+                className="rounded-md bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+              >
+                Delete
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
+          <div className="rounded-lg border border-border bg-card p-6">
+            <h2 className="text-xl font-semibold text-foreground mb-4">
+              Tournament Information
+            </h2>
+            <dl className="space-y-3">
+              <div className="grid grid-cols-3 gap-4">
+                <dt className="text-sm font-medium text-muted-foreground">Location</dt>
+                <dd className="col-span-2 text-foreground">{tournament.location}</dd>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <dt className="text-sm font-medium text-muted-foreground">Season</dt>
+                <dd className="col-span-2">
+                  {tournament.season ? (
+                    <Link
+                      to={`/seasons/${tournament.season.id}`}
+                      className="text-primary hover:text-primary/80"
+                    >
+                      {tournament.season.name}
+                    </Link>
+                  ) : (
+                    <span className="text-muted-foreground">N/A</span>
+                  )}
+                </dd>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <dt className="text-sm font-medium text-muted-foreground">
+                  Max Participants
+                </dt>
+                <dd className="col-span-2 text-foreground">
+                  {tournament.maxParticipants || 'Unlimited'}
+                </dd>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <dt className="text-sm font-medium text-muted-foreground">
+                  Current Participants
+                </dt>
+                <dd className="col-span-2 text-2xl font-bold text-foreground">
+                  {tournament._count?.participations || 0}
+                </dd>
+              </div>
+              {tournament.description && (
+                <div className="grid grid-cols-3 gap-4 pt-3 border-t border-border">
+                  <dt className="text-sm font-medium text-muted-foreground">
+                    Description
+                  </dt>
+                  <dd className="col-span-2 text-foreground">{tournament.description}</dd>
+                </div>
+              )}
+            </dl>
+          </div>
+
+          {tournament.participations && tournament.participations.length > 0 && (
+            <div className="rounded-lg border border-border bg-card p-6">
+              <h2 className="text-xl font-semibold text-foreground mb-4">
+                Participants & Results
+              </h2>
+              <div className="space-y-2">
+                {tournament.participations.map((participation) => (
+                  <div
+                    key={participation.id}
+                    className="flex items-center justify-between rounded-md border border-border p-4"
+                  >
+                    <div className="flex items-center gap-4">
+                      {participation.finalPosition && (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">
+                          {participation.finalPosition}
+                        </div>
+                      )}
+                      <div>
+                        <Link
+                          to={`/players/${participation.player?.id}`}
+                          className="font-semibold text-foreground hover:text-primary"
+                        >
+                          {participation.player?.firstName} {participation.player?.lastName}
+                        </Link>
+                        {participation.totalScore && (
+                          <p className="text-sm text-muted-foreground">
+                            Score: {participation.totalScore}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    {participation.ratingPointsEarned && (
+                      <div className="text-right">
+                        <p className="text-sm text-muted-foreground">Points Earned</p>
+                        <p className="text-lg font-bold text-primary">
+                          {participation.ratingPointsEarned}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-6">
+          {isAdmin && (
+            <div className="rounded-lg border border-border bg-card p-6">
+              <h2 className="text-xl font-semibold text-foreground mb-4">
+                Status Management
+              </h2>
+              <div className="space-y-2">
+                <button
+                  onClick={() => handleStatusChange(TournamentStatus.UPCOMING)}
+                  disabled={
+                    tournament.status === TournamentStatus.UPCOMING ||
+                    updateStatus.isPending
+                  }
+                  className="w-full rounded-md bg-blue-100 px-4 py-2 text-sm font-semibold text-blue-800 hover:bg-blue-200 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+                >
+                  Set as Upcoming
+                </button>
+                <button
+                  onClick={() => handleStatusChange(TournamentStatus.ONGOING)}
+                  disabled={
+                    tournament.status === TournamentStatus.ONGOING ||
+                    updateStatus.isPending
+                  }
+                  className="w-full rounded-md bg-yellow-100 px-4 py-2 text-sm font-semibold text-yellow-800 hover:bg-yellow-200 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-yellow-900/30 dark:text-yellow-400 dark:hover:bg-yellow-900/50"
+                >
+                  Set as Ongoing
+                </button>
+                <button
+                  onClick={() => handleStatusChange(TournamentStatus.COMPLETED)}
+                  disabled={
+                    tournament.status === TournamentStatus.COMPLETED ||
+                    updateStatus.isPending
+                  }
+                  className="w-full rounded-md bg-green-100 px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-200 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+                >
+                  Set as Completed
+                </button>
+              </div>
+            </div>
+          )}
+
+          {tournament.season?.ratingConfigurations &&
+            tournament.season.ratingConfigurations.length > 0 && (
+              <div className="rounded-lg border border-border bg-card p-6">
+                <h2 className="text-xl font-semibold text-foreground mb-4">
+                  Rating Points
+                </h2>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Points distribution for this tournament:
+                </p>
+                <div className="space-y-2">
+                  {Object.entries(
+                    tournament.season.ratingConfigurations[0].pointsDistribution,
+                  )
+                    .sort(([a], [b]) => Number(a) - Number(b))
+                    .map(([position, points]) => (
+                      <div
+                        key={position}
+                        className="flex justify-between items-center rounded-md bg-muted/50 px-3 py-2"
+                      >
+                        <span className="text-sm font-medium text-foreground">
+                          {position === '1'
+                            ? '1st'
+                            : position === '2'
+                              ? '2nd'
+                              : position === '3'
+                                ? '3rd'
+                                : `${position}th`}{' '}
+                          Place
+                        </span>
+                        <span className="text-sm font-bold text-primary">{points} pts</span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+        </div>
+      </div>
+    </div>
+  );
+};
