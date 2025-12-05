@@ -1,0 +1,208 @@
+// Prisma schema for Bowling League Organizer
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Authentication & Authorization
+model User {
+  id                 String         @id @default(uuid())
+  email              String         @unique
+  password           String         // hashed with bcrypt
+  role               UserRole       @default(REGULAR)
+  languagePreference String         @default("en")
+  themePreference    String         @default("light")
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  player             Player?
+  notifications      Notification[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  REGULAR
+}
+
+// Players
+model Player {
+  id               String                      @id @default(uuid())
+  userId           String?                     @unique
+  user             User?                       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  firstName        String
+  lastName         String
+  email            String?
+  phone            String?
+  registrationDate DateTime                    @default(now())
+  isActive         Boolean                     @default(true)
+  createdAt        DateTime                    @default(now())
+  updatedAt        DateTime                    @updatedAt
+
+  participations   TournamentParticipation[]
+  applications     TournamentApplication[]
+  statistics       PlayerStatistics[]
+
+  @@map("players")
+}
+
+// Seasons (3-month periods)
+model Season {
+  id                   String                 @id @default(uuid())
+  name                 String
+  startDate            DateTime
+  endDate              DateTime
+  isActive             Boolean                @default(true)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  tournaments          Tournament[]
+  ratingConfigurations RatingConfiguration[]
+  statistics           PlayerStatistics[]
+
+  @@map("seasons")
+}
+
+// Rating Configuration (points per place)
+model RatingConfiguration {
+  id                 String   @id @default(uuid())
+  seasonId           String   @unique
+  season             Season   @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  // JSON structure: { "1": 100, "2": 80, "3": 60, ... }
+  pointsDistribution Json
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("rating_configurations")
+}
+
+// Tournaments
+model Tournament {
+  id              String                      @id @default(uuid())
+  seasonId        String
+  season          Season                      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  name            String
+  date            DateTime
+  location        String
+  maxParticipants Int?
+  description     String?
+
+  status          TournamentStatus            @default(UPCOMING)
+
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  participations  TournamentParticipation[]
+  applications    TournamentApplication[]
+
+  @@map("tournaments")
+}
+
+enum TournamentStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+}
+
+// Tournament Applications
+model TournamentApplication {
+  id              String            @id @default(uuid())
+  tournamentId    String
+  tournament      Tournament        @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  playerId        String
+  player          Player            @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  applicationDate DateTime          @default(now())
+  status          ApplicationStatus @default(PENDING)
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([tournamentId, playerId])
+  @@map("tournament_applications")
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// Tournament Participation & Results
+model TournamentParticipation {
+  id                  String     @id @default(uuid())
+  tournamentId        String
+  tournament          Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  playerId            String
+  player              Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  handicap            Float?
+  totalScore          Float?
+  finalPosition       Int?
+  ratingPointsEarned  Float?
+
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@unique([tournamentId, playerId])
+  @@map("tournament_participations")
+}
+
+// Player Statistics
+model PlayerStatistics {
+  id                     String   @id @default(uuid())
+  playerId               String
+  player                 Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  seasonId               String?
+  season                 Season?  @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  // Statistics
+  averageScore           Float    @default(0)
+  highestScore           Int      @default(0)
+  totalTournamentsPlayed Int      @default(0)
+  totalRatingPoints      Float    @default(0)
+
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  // Null seasonId = overall statistics
+  // Non-null seasonId = season-specific statistics
+  @@unique([playerId, seasonId])
+  @@map("player_statistics")
+}
+
+// Notifications
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      NotificationType
+  title     String
+  message   String
+
+  isRead    Boolean          @default(false)
+  isSent    Boolean          @default(false)
+
+  createdAt DateTime         @default(now())
+  sentAt    DateTime?
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  TOURNAMENT_UPCOMING
+  RESULTS_UPDATE
+  APPLICATION_STATUS
+  SYSTEM_ANNOUNCEMENT
+}
