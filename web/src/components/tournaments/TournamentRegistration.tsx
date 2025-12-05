@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { usePlayers } from '../../hooks/usePlayers';
 import { useApplyToTournament } from '../../hooks/useTournaments';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -34,13 +35,13 @@ export const TournamentRegistration: React.FC<TournamentRegistrationProps> = ({
         onSuccess: () => {
           setSelectedPlayerId('');
           if (isAdminUser) {
-            alert('Player added to tournament successfully!');
+            toast.success('Player added to tournament successfully!');
           } else {
-            alert('Application submitted successfully! Waiting for admin approval.');
+            toast.success('Application submitted! Waiting for admin approval.');
           }
         },
         onError: (error: any) => {
-          alert(error.response?.data?.message || 'Failed to submit application');
+          toast.error(error.response?.data?.message || 'Failed to submit application');
         },
       }
     );

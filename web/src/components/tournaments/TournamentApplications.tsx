@@ -1,4 +1,5 @@
 import React from 'react';
+import toast from 'react-hot-toast';
 import {
   useTournamentApplications,
   useApproveApplication,
@@ -17,36 +18,32 @@ export const TournamentApplications: React.FC<TournamentApplicationsProps> = ({
   const approveApplication = useApproveApplication();
   const rejectApplication = useRejectApplication();
 
-  const handleApprove = (applicationId: string) => {
-    if (window.confirm('Approve this application?')) {
-      approveApplication.mutate(
-        { tournamentId, applicationId },
-        {
-          onSuccess: () => {
-            alert('Application approved successfully!');
-          },
-          onError: (error: any) => {
-            alert(error.response?.data?.message || 'Failed to approve application');
-          },
-        }
-      );
-    }
+  const handleApprove = (applicationId: string, playerName: string) => {
+    approveApplication.mutate(
+      { tournamentId, applicationId },
+      {
+        onSuccess: () => {
+          toast.success(`${playerName} has been added to the tournament!`);
+        },
+        onError: (error: any) => {
+          toast.error(error.response?.data?.message || 'Failed to approve application');
+        },
+      }
+    );
   };
 
-  const handleReject = (applicationId: string) => {
-    if (window.confirm('Reject this application?')) {
-      rejectApplication.mutate(
-        { tournamentId, applicationId },
-        {
-          onSuccess: () => {
-            alert('Application rejected.');
-          },
-          onError: (error: any) => {
-            alert(error.response?.data?.message || 'Failed to reject application');
-          },
-        }
-      );
-    }
+  const handleReject = (applicationId: string, playerName: string) => {
+    rejectApplication.mutate(
+      { tournamentId, applicationId },
+      {
+        onSuccess: () => {
+          toast.success(`${playerName}'s application has been rejected.`);
+        },
+        onError: (error: any) => {
+          toast.error(error.response?.data?.message || 'Failed to reject application');
+        },
+      }
+    );
   };
 
   const getStatusBadgeColor = (status: ApplicationStatus) => {
@@ -113,7 +110,7 @@ export const TournamentApplications: React.FC<TournamentApplicationsProps> = ({
                 </div>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => handleApprove(application.id)}
+                    onClick={() => handleApprove(application.id, `${application.player?.firstName} ${application.player?.lastName}`)}
                     disabled={
                       approveApplication.isPending || rejectApplication.isPending
                     }
@@ -122,7 +119,7 @@ export const TournamentApplications: React.FC<TournamentApplicationsProps> = ({
                     Approve
                   </button>
                   <button
-                    onClick={() => handleReject(application.id)}
+                    onClick={() => handleReject(application.id, `${application.player?.firstName} ${application.player?.lastName}`)}
                     disabled={
                       approveApplication.isPending || rejectApplication.isPending
                     }
