@@ -9,7 +9,8 @@
       "Bash(npx prisma init)",
       "Bash(npx tailwindcss:*)",
       "Bash(npx prisma:*)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

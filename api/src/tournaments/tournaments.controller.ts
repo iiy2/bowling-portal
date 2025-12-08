@@ -15,6 +15,7 @@ import { TournamentsService } from './tournaments.service';
 import { CreateTournamentDto, TournamentStatus } from './dto/create-tournament.dto';
 import { UpdateTournamentDto } from './dto/update-tournament.dto';
 import { TournamentQueryDto } from './dto/tournament-query.dto';
+import { UpdateParticipationResultDto } from './dto/update-participation-result.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -163,5 +164,23 @@ export class TournamentsController {
   @ApiResponse({ status: 404, description: 'Tournament not found' })
   getParticipants(@Param('id') id: string) {
     return this.tournamentsService.getParticipants(id);
+  }
+
+  @Patch(':id/participants/:participationId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Update participant results (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Participation results updated successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
+  @ApiResponse({ status: 404, description: 'Tournament or participation not found' })
+  updateParticipationResult(
+    @Param('id') tournamentId: string,
+    @Param('participationId') participationId: string,
+    @Body() updateData: UpdateParticipationResultDto,
+  ) {
+    return this.tournamentsService.updateParticipationResult(tournamentId, participationId, updateData);
   }
 }

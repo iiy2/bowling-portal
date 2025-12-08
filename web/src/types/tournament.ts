@@ -34,6 +34,7 @@ export interface TournamentParticipation {
   playerId: string;
   finalPosition?: number;
   handicap?: number;
+  gameScores?: number[];
   totalScore?: number;
   ratingPointsEarned?: number;
   createdAt: string;

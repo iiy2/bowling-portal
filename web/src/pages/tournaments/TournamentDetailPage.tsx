@@ -9,6 +9,8 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { TournamentStatus } from '../../types/tournament';
 import { TournamentRegistration } from '../../components/tournaments/TournamentRegistration';
 import { TournamentApplications } from '../../components/tournaments/TournamentApplications';
+import { TournamentResultsEntry } from '../../components/tournaments/TournamentResultsEntry';
+import { TournamentResultsTable } from '../../components/tournaments/TournamentResultsTable';
 
 export const TournamentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -16,7 +18,7 @@ export const TournamentDetailPage: React.FC = () => {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'ADMIN';
 
-  const { data: tournament, isLoading, error } = useTournament(id!);
+  const { data: tournament, isLoading, error, refetch } = useTournament(id!);
   const deleteTournament = useDeleteTournament();
   const updateStatus = useUpdateTournamentStatus();
 
@@ -186,49 +188,20 @@ export const TournamentDetailPage: React.FC = () => {
             </dl>
           </div>
 
-          {tournament.participations && tournament.participations.length > 0 && (
-            <div className="rounded-lg border border-border bg-card p-6">
-              <h2 className="text-xl font-semibold text-foreground mb-4">
-                Participants & Results
-              </h2>
-              <div className="space-y-2">
-                {tournament.participations.map((participation) => (
-                  <div
-                    key={participation.id}
-                    className="flex items-center justify-between rounded-md border border-border p-4"
-                  >
-                    <div className="flex items-center gap-4">
-                      {participation.finalPosition && (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-bold">
-                          {participation.finalPosition}
-                        </div>
-                      )}
-                      <div>
-                        <Link
-                          to={`/players/${participation.player?.id}`}
-                          className="font-semibold text-foreground hover:text-primary"
-                        >
-                          {participation.player?.firstName} {participation.player?.lastName}
-                        </Link>
-                        {participation.totalScore && (
-                          <p className="text-sm text-muted-foreground">
-                            Score: {participation.totalScore}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    {participation.ratingPointsEarned && (
-                      <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Points Earned</p>
-                        <p className="text-lg font-bold text-primary">
-                          {participation.ratingPointsEarned}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+          {isAdmin && tournament.status === TournamentStatus.ONGOING && tournament.participations && (
+            <TournamentResultsEntry
+              tournamentId={id!}
+              participations={tournament.participations}
+              onResultsUpdated={() => refetch()}
+            />
+          )}
+
+          {tournament.status === TournamentStatus.COMPLETED && tournament.participations && tournament.participations.length > 0 && (
+            <TournamentResultsTable participations={tournament.participations} />
+          )}
+
+          {tournament.status === TournamentStatus.ONGOING && !isAdmin && tournament.participations && tournament.participations.length > 0 && (
+            <TournamentResultsTable participations={tournament.participations} />
           )}
         </div>
 

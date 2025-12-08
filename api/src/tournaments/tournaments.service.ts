@@ -11,6 +11,7 @@ import {
 } from './dto/create-tournament.dto';
 import { UpdateTournamentDto } from './dto/update-tournament.dto';
 import { TournamentQueryDto } from './dto/tournament-query.dto';
+import { UpdateParticipationResultDto } from './dto/update-participation-result.dto';
 
 @Injectable()
 export class TournamentsService {
@@ -493,6 +494,50 @@ export class TournamentsService {
         player: true,
       },
       orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  async updateParticipationResult(
+    tournamentId: string,
+    participationId: string,
+    updateData: UpdateParticipationResultDto,
+  ) {
+    // Verify tournament exists
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: tournamentId },
+    });
+
+    if (!tournament) {
+      throw new NotFoundException(`Tournament with ID ${tournamentId} not found`);
+    }
+
+    // Verify participation exists and belongs to tournament
+    const participation = await this.prisma.tournamentParticipation.findUnique({
+      where: { id: participationId },
+    });
+
+    if (!participation) {
+      throw new NotFoundException(`Participation with ID ${participationId} not found`);
+    }
+
+    if (participation.tournamentId !== tournamentId) {
+      throw new BadRequestException('Participation does not belong to this tournament');
+    }
+
+    // If game scores are provided, calculate total score automatically
+    const dataToUpdate: any = { ...updateData };
+    if (updateData.gameScores && Array.isArray(updateData.gameScores)) {
+      dataToUpdate.totalScore = updateData.gameScores.reduce((sum, score) => sum + score, 0);
+    }
+
+    // Update the participation with results
+    return this.prisma.tournamentParticipation.update({
+      where: { id: participationId },
+      data: dataToUpdate,
+      include: {
+        player: true,
+        tournament: true,
+      },
     });
   }
 }

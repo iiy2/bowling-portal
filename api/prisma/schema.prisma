@@ -146,7 +146,8 @@ model TournamentParticipation {
   player              Player     @relation(fields: [playerId], references: [id], onDelete: Cascade)
 
   handicap            Float?
-  totalScore          Float?
+  gameScores          Json?      // Array of individual game scores: [180, 210, 195, ...]
+  totalScore          Float?     // Sum of all game scores
   finalPosition       Int?
   ratingPointsEarned  Float?
 
