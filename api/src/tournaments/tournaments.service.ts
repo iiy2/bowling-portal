@@ -461,10 +461,14 @@ export class TournamentsService {
     // Admin users: directly create participation (no approval needed)
     // Regular users: create application that requires approval
     if (userRole === 'ADMIN') {
+      // Calculate handicap for the player
+      const handicap = await this.calculateHandicap(playerId, tournament.seasonId);
+
       const participation = await this.prisma.tournamentParticipation.create({
         data: {
           tournamentId,
           playerId,
+          handicap: handicap,
         },
         include: {
           player: true,
@@ -511,6 +515,75 @@ export class TournamentsService {
     });
   }
 
+  /**
+   * Calculate handicap for a player based on their last 2 tournaments
+   * Formula: (180 - average of first 6 games from last 2 tournaments) / 2
+   */
+  private async calculateHandicap(playerId: string, seasonId: string): Promise<number | null> {
+    // Get player's completed participations in the season, ordered by tournament date
+    const allParticipations = await this.prisma.tournamentParticipation.findMany({
+      where: {
+        playerId,
+        tournament: {
+          seasonId,
+          status: 'COMPLETED',
+        },
+      },
+      include: {
+        tournament: {
+          select: {
+            date: true,
+          },
+        },
+      },
+      orderBy: {
+        tournament: {
+          date: 'desc',
+        },
+      },
+    });
+
+    // Filter participations that have gameScores and take last 2
+    const participations = allParticipations
+      .filter(p => p.gameScores && Array.isArray(p.gameScores))
+      .slice(0, 2);
+
+    // Player needs to have participated in at least 2 completed tournaments with scores
+    if (participations.length < 2) {
+      return null;
+    }
+
+    let totalScore = 0;
+    let totalGames = 0;
+
+    participations.forEach((participation) => {
+      if (participation.gameScores && Array.isArray(participation.gameScores)) {
+        const gameScores = participation.gameScores as number[];
+        // Take only first 6 games
+        const first6Games = gameScores.slice(0, 6);
+
+        first6Games.forEach((score) => {
+          if (typeof score === 'number' && !isNaN(score) && score > 0) {
+            totalScore += score;
+            totalGames += 1;
+          }
+        });
+      }
+    });
+
+    // Calculate average if we have games
+    if (totalGames === 0) {
+      return null;
+    }
+
+    const average = totalScore / totalGames;
+    const handicap = (180 - average) / 2;
+
+    // Round to nearest whole number and clamp to range [-15, 15]
+    const roundedHandicap = Math.round(handicap);
+    return Math.max(-15, Math.min(15, roundedHandicap));
+  }
+
   async approveApplication(applicationId: string) {
     const application = await this.prisma.tournamentApplication.findUnique({
       where: { id: applicationId },
@@ -537,6 +610,12 @@ export class TournamentsService {
       throw new BadRequestException('Tournament is full');
     }
 
+    // Calculate handicap for the player
+    const handicap = await this.calculateHandicap(
+      application.playerId,
+      application.tournament.seasonId,
+    );
+
     // Update application status and create participation in a transaction
     const [updatedApplication, participation] = await this.prisma.$transaction([
       this.prisma.tournamentApplication.update({
@@ -548,6 +627,7 @@ export class TournamentsService {
         data: {
           tournamentId: application.tournamentId,
           playerId: application.playerId,
+          handicap: handicap,
         },
         include: { player: true },
       }),
