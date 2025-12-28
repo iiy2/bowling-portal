@@ -272,21 +272,15 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
               </tr>
             </thead>
             <tbody>
-              {sortedParticipations.map((participation) => {
+              {sortedParticipations.map((participation, index) => {
                 const displayScores = participation.gameScores || [];
 
                 return (
                   <tr key={participation.id} className="border-b border-border">
                     <td className="py-3 px-2 sticky left-0 bg-card">
-                      <input
-                        type="number"
-                        min="1"
-                        defaultValue={participation.finalPosition || ''}
-                        onChange={(e) => handleChange(e, participation.id, participation, 'finalPosition')}
-                        disabled={savingCell === `${participation.id}-finalPosition`}
-                        className="w-14 rounded border-0 bg-transparent px-1 py-1 text-xs text-center text-foreground focus:bg-muted focus:outline-none disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        placeholder="1"
-                      />
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
+                        {index + 1}
+                      </span>
                     </td>
                     <td className="py-3 px-2">
                       <span className="font-medium text-foreground text-sm">

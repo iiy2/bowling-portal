@@ -171,7 +171,7 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
               </tr>
             </thead>
             <tbody>
-              {sortedParticipations.map((participation) => {
+              {sortedParticipations.map((participation, index) => {
                 const hasResults = participation.finalPosition !== null || participation.totalScore !== null;
                 const gameScores = participation.gameScores || [];
 
@@ -181,13 +181,9 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
                     className={`border-b border-border ${!hasResults ? 'opacity-60' : ''}`}
                   >
                     <td className="py-3 px-2 sticky left-0 bg-card">
-                      {participation.finalPosition ? (
-                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
-                          {participation.finalPosition}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">-</span>
-                      )}
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
+                        {index + 1}
+                      </span>
                     </td>
                     <td className="py-3 px-2">
                       <span className="font-medium text-foreground">
