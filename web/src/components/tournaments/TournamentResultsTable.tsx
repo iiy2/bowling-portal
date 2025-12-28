@@ -59,15 +59,19 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
           break;
 
         case 'total':
-          const totalA = a.totalScore ?? 0;
-          const totalB = b.totalScore ?? 0;
-          compareResult = totalA - totalB;
+          // Nulls last
+          if (a.totalScore === null && b.totalScore === null) return 0;
+          if (a.totalScore === null) return 1;
+          if (b.totalScore === null) return -1;
+          compareResult = (a.totalScore || 0) - (b.totalScore || 0);
           break;
 
         case 'rating':
-          const ratingA = a.ratingPointsEarned ?? 0;
-          const ratingB = b.ratingPointsEarned ?? 0;
-          compareResult = ratingA - ratingB;
+          // Nulls last
+          if (a.ratingPointsEarned === null && b.ratingPointsEarned === null) return 0;
+          if (a.ratingPointsEarned === null) return 1;
+          if (b.ratingPointsEarned === null) return -1;
+          compareResult = (a.ratingPointsEarned || 0) - (b.ratingPointsEarned || 0);
           break;
 
         default:
