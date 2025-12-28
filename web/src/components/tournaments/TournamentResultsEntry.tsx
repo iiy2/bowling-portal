@@ -158,20 +158,28 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                         {participation.handicap ?? '-'}
                       </span>
                     </td>
-                    {Array.from({ length: numberOfGames }, (_, gameIndex) => (
-                      <td key={gameIndex} className="py-3 px-2">
-                        <input
-                          type="number"
-                          min="0"
-                          max="300"
-                          defaultValue={displayScores[gameIndex] || ''}
-                          onChange={(e) => handleChange(e, participation.id, participation, `game-${gameIndex}`)}
-                          disabled={savingCell === `${participation.id}-game-${gameIndex}`}
-                          className="w-14 rounded border-0 bg-transparent px-1 py-1 text-xs text-center text-foreground focus:bg-muted focus:outline-none disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          placeholder="0"
-                        />
-                      </td>
-                    ))}
+                    {Array.from({ length: numberOfGames }, (_, gameIndex) => {
+                      const score = displayScores[gameIndex] || 0;
+                      const isHighScore = score >= 200;
+                      return (
+                        <td key={gameIndex} className="py-3 px-2">
+                          <input
+                            type="number"
+                            min="0"
+                            max="300"
+                            defaultValue={displayScores[gameIndex] || ''}
+                            onChange={(e) => handleChange(e, participation.id, participation, `game-${gameIndex}`)}
+                            disabled={savingCell === `${participation.id}-game-${gameIndex}`}
+                            className={`w-14 rounded border-0 px-1 py-1 text-xs text-center focus:outline-none disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                              isHighScore
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100 font-bold focus:bg-green-200 dark:focus:bg-green-900/50'
+                                : 'bg-transparent text-foreground focus:bg-muted'
+                            }`}
+                            placeholder="0"
+                          />
+                        </td>
+                      );
+                    })}
                     <td className="py-3 px-2 text-center">
                       <span className="font-semibold text-foreground text-sm">
                         {participation.totalScore || '-'}

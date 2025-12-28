@@ -77,11 +77,17 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
                     <td className="py-3 px-2 text-sm text-foreground">
                       {participation.handicap ?? '-'}
                     </td>
-                    {numberOfGames > 0 && Array.from({ length: numberOfGames }, (_, gameIndex) => (
-                      <td key={gameIndex} className="py-3 px-2 text-center text-sm text-foreground">
-                        {gameScores[gameIndex] || '-'}
-                      </td>
-                    ))}
+                    {numberOfGames > 0 && Array.from({ length: numberOfGames }, (_, gameIndex) => {
+                      const score = gameScores[gameIndex] || 0;
+                      const isHighScore = score >= 200;
+                      return (
+                        <td key={gameIndex} className="py-3 px-2 text-center text-sm">
+                          <span className={isHighScore ? 'font-bold text-green-700 dark:text-green-400' : 'text-foreground'}>
+                            {gameScores[gameIndex] || '-'}
+                          </span>
+                        </td>
+                      );
+                    })}
                     <td className="py-3 px-2 text-right">
                       <span className="font-semibold text-foreground">
                         {participation.totalScore || '-'}
