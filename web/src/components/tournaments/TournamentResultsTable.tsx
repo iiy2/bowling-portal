@@ -88,11 +88,11 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
 
   const SortIcon: React.FC<{ field: SortField }> = ({ field }) => {
     if (sortField !== field) {
-      return <span className="text-muted-foreground opacity-0 group-hover:opacity-50">↕</span>;
+      return <span className="text-muted-foreground group-hover:text-foreground transition-colors text-base">⇅</span>;
     }
     return (
-      <span className="text-primary">
-        {sortDirection === 'asc' ? '↑' : '↓'}
+      <span className="text-primary font-bold text-base">
+        {sortDirection === 'asc' ? '▲' : '▼'}
       </span>
     );
   };
@@ -111,7 +111,7 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
                 <th className="sticky left-0 bg-card">
                   <button
                     onClick={() => handleSort('position')}
-                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1"
+                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
                   >
                     Position
                     <SortIcon field="position" />
@@ -120,7 +120,7 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
                 <th>
                   <button
                     onClick={() => handleSort('player')}
-                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1"
+                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
                   >
                     Player
                     <SortIcon field="player" />
@@ -129,7 +129,7 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
                 <th>
                   <button
                     onClick={() => handleSort('handicap')}
-                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1"
+                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
                   >
                     HC
                     <SortIcon field="handicap" />
@@ -139,7 +139,7 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
                   <th key={i}>
                     <button
                       onClick={() => handleSort(`game-${i}` as SortField)}
-                      className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary transition-colors flex items-center justify-center gap-1"
+                      className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
                     >
                       G{i + 1}
                       <SortIcon field={`game-${i}` as SortField} />
@@ -149,7 +149,7 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
                 <th>
                   <button
                     onClick={() => handleSort('total')}
-                    className="group w-full text-right py-3 px-2 text-sm font-semibold text-foreground hover:text-primary transition-colors flex items-center justify-end gap-1"
+                    className="group w-full text-right py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-end gap-1 cursor-pointer"
                   >
                     Total
                     <SortIcon field="total" />
@@ -158,7 +158,7 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
                 <th className="sticky right-0 bg-card">
                   <button
                     onClick={() => handleSort('rating')}
-                    className="group w-full text-right py-3 px-2 text-sm font-semibold text-foreground hover:text-primary transition-colors flex items-center justify-end gap-1"
+                    className="group w-full text-right py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-end gap-1 cursor-pointer"
                   >
                     Rating Points
                     <SortIcon field="rating" />
