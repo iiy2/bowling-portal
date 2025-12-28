@@ -215,6 +215,15 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
               <tr className="border-b border-border">
                 <th className="sticky left-0 bg-card">
                   <button
+                    onClick={() => handleSort('position')}
+                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    Pos
+                    <SortIcon field="position" />
+                  </button>
+                </th>
+                <th>
+                  <button
                     onClick={() => handleSort('player')}
                     className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
                   >
@@ -253,15 +262,6 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                 </th>
                 <th>
                   <button
-                    onClick={() => handleSort('position')}
-                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    Pos
-                    <SortIcon field="position" />
-                  </button>
-                </th>
-                <th>
-                  <button
                     onClick={() => handleSort('points')}
                     className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
                   >
@@ -278,6 +278,17 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                 return (
                   <tr key={participation.id} className="border-b border-border">
                     <td className="py-3 px-2 sticky left-0 bg-card">
+                      <input
+                        type="number"
+                        min="1"
+                        defaultValue={participation.finalPosition || ''}
+                        onChange={(e) => handleChange(e, participation.id, participation, 'finalPosition')}
+                        disabled={savingCell === `${participation.id}-finalPosition`}
+                        className="w-14 rounded border-0 bg-transparent px-1 py-1 text-xs text-center text-foreground focus:bg-muted focus:outline-none disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        placeholder="1"
+                      />
+                    </td>
+                    <td className="py-3 px-2">
                       <span className="font-medium text-foreground text-sm">
                         {participation.player?.firstName} {participation.player?.lastName}
                       </span>
@@ -313,17 +324,6 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                       <span className="font-semibold text-foreground text-sm">
                         {participation.totalScore || '-'}
                       </span>
-                    </td>
-                    <td className="py-3 px-2">
-                      <input
-                        type="number"
-                        min="1"
-                        defaultValue={participation.finalPosition || ''}
-                        onChange={(e) => handleChange(e, participation.id, participation, 'finalPosition')}
-                        disabled={savingCell === `${participation.id}-finalPosition`}
-                        className="w-14 rounded border-0 bg-transparent px-1 py-1 text-xs text-center text-foreground focus:bg-muted focus:outline-none disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        placeholder="1"
-                      />
                     </td>
                     <td className="py-3 px-2">
                       <input
