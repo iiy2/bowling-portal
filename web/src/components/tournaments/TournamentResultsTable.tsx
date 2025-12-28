@@ -112,14 +112,8 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="sticky left-0 bg-card">
-                  <button
-                    onClick={() => handleSort('position')}
-                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    Position
-                    <SortIcon field="position" />
-                  </button>
+                <th className="sticky left-0 bg-card text-left py-3 px-2 text-sm font-semibold text-foreground">
+                  Position
                 </th>
                 <th>
                   <button
