@@ -10,7 +10,7 @@ interface TournamentResultsEntryProps {
   onResultsUpdated: () => void;
 }
 
-type SortField = 'player' | 'handicap' | 'total' | 'position' | 'points' | `game-${number}`;
+type SortField = 'player' | 'handicap' | 'total' | 'position' | 'points' | 'average' | `game-${number}`;
 type SortDirection = 'asc' | 'desc';
 
 export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
@@ -86,6 +86,15 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
           if (a.ratingPointsEarned === null) return 1;
           if (b.ratingPointsEarned === null) return -1;
           compareResult = (a.ratingPointsEarned || 0) - (b.ratingPointsEarned || 0);
+          break;
+
+        case 'average':
+          // Calculate averages
+          const scoresA = a.gameScores?.filter(score => score > 0) || [];
+          const scoresB = b.gameScores?.filter(score => score > 0) || [];
+          const avgA = scoresA.length > 0 ? scoresA.reduce((sum, score) => sum + score, 0) / scoresA.length : 0;
+          const avgB = scoresB.length > 0 ? scoresB.reduce((sum, score) => sum + score, 0) / scoresB.length : 0;
+          compareResult = avgA - avgB;
           break;
 
         default:
@@ -253,6 +262,15 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                 ))}
                 <th>
                   <button
+                    onClick={() => handleSort('average')}
+                    className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    Avg
+                    <SortIcon field="average" />
+                  </button>
+                </th>
+                <th>
+                  <button
                     onClick={() => handleSort('total')}
                     className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
                   >
@@ -311,6 +329,16 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                         </td>
                       );
                     })}
+                    <td className="py-3 px-2 text-center">
+                      <span className="text-sm text-muted-foreground">
+                        {(() => {
+                          const validScores = displayScores.filter(score => score > 0);
+                          if (validScores.length === 0) return '-';
+                          const average = validScores.reduce((sum, score) => sum + score, 0) / validScores.length;
+                          return average.toFixed(1);
+                        })()}
+                      </span>
+                    </td>
                     <td className="py-3 px-2 text-center">
                       <span className="font-semibold text-foreground text-sm">
                         {participation.totalScore || '-'}
