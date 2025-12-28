@@ -10,6 +10,9 @@ interface TournamentResultsEntryProps {
   onResultsUpdated: () => void;
 }
 
+type SortField = 'player' | 'handicap' | 'total' | 'position' | 'points' | `game-${number}`;
+type SortDirection = 'asc' | 'desc';
+
 export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
   tournamentId,
   participations,
@@ -17,12 +20,94 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
 }) => {
   const [savingCell, setSavingCell] = useState<string | null>(null);
   const saveTimeoutRef = useRef<{ [key: string]: ReturnType<typeof setTimeout> }>({});
+  const [sortField, setSortField] = useState<SortField>('player');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   // Calculate number of games based on number of players
   const numberOfGames = useMemo(() =>
     calculateNumberOfGames(participations.length),
     [participations.length]
   );
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Toggle direction if clicking same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Default to ascending for new field
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Sort participations based on current sort field and direction
+  const sortedParticipations = useMemo(() => {
+    const sorted = [...participations].sort((a, b) => {
+      let compareResult = 0;
+
+      switch (sortField) {
+        case 'player':
+          const nameA = `${a.player?.firstName || ''} ${a.player?.lastName || ''}`.trim();
+          const nameB = `${b.player?.firstName || ''} ${b.player?.lastName || ''}`.trim();
+          compareResult = nameA.localeCompare(nameB);
+          break;
+
+        case 'handicap':
+          const hcA = a.handicap ?? 0;
+          const hcB = b.handicap ?? 0;
+          compareResult = hcA - hcB;
+          break;
+
+        case 'total':
+          // Nulls last
+          if (a.totalScore === null && b.totalScore === null) return 0;
+          if (a.totalScore === null) return 1;
+          if (b.totalScore === null) return -1;
+          compareResult = (a.totalScore || 0) - (b.totalScore || 0);
+          break;
+
+        case 'position':
+          // Nulls last
+          if (a.finalPosition === null && b.finalPosition === null) return 0;
+          if (a.finalPosition === null) return 1;
+          if (b.finalPosition === null) return -1;
+          compareResult = (a.finalPosition || 0) - (b.finalPosition || 0);
+          break;
+
+        case 'points':
+          // Nulls last
+          if (a.ratingPointsEarned === null && b.ratingPointsEarned === null) return 0;
+          if (a.ratingPointsEarned === null) return 1;
+          if (b.ratingPointsEarned === null) return -1;
+          compareResult = (a.ratingPointsEarned || 0) - (b.ratingPointsEarned || 0);
+          break;
+
+        default:
+          // Handle game-specific sorting
+          if (sortField.startsWith('game-')) {
+            const gameIndex = parseInt(sortField.split('-')[1]);
+            const scoreA = (a.gameScores?.[gameIndex] ?? 0);
+            const scoreB = (b.gameScores?.[gameIndex] ?? 0);
+            compareResult = scoreA - scoreB;
+          }
+      }
+
+      return sortDirection === 'asc' ? compareResult : -compareResult;
+    });
+
+    return sorted;
+  }, [participations, sortField, sortDirection]);
+
+  const SortIcon: React.FC<{ field: SortField }> = ({ field }) => {
+    if (sortField !== field) {
+      return <span className="text-muted-foreground group-hover:text-foreground transition-colors text-base">⇅</span>;
+    }
+    return (
+      <span className="text-primary font-bold text-base">
+        {sortDirection === 'asc' ? '▲' : '▼'}
+      </span>
+    );
+  };
 
   const saveField = async (
     participationId: string,
@@ -117,7 +202,7 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
           Number of games: {numberOfGames} ({participations.length} players: {participations.length <= 8 ? '≤8 = 6 games' : participations.length <= 12 ? '9-12 = 7 games' : '13+ = 8 games'})
         </p>
         <p className="text-xs text-muted-foreground mt-1">
-          Click any cell to edit. Changes save automatically.
+          Click any cell to edit. Changes save automatically. Click column headers to sort.
         </p>
       </div>
 
@@ -128,22 +213,66 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left py-3 px-2 text-sm font-semibold text-foreground sticky left-0 bg-card">
-                  Player
+                <th className="sticky left-0 bg-card">
+                  <button
+                    onClick={() => handleSort('player')}
+                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    Player
+                    <SortIcon field="player" />
+                  </button>
                 </th>
-                <th className="text-left py-3 px-2 text-sm font-semibold text-foreground">HC</th>
+                <th>
+                  <button
+                    onClick={() => handleSort('handicap')}
+                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    HC
+                    <SortIcon field="handicap" />
+                  </button>
+                </th>
                 {Array.from({ length: numberOfGames }, (_, i) => (
-                  <th key={i} className="text-center py-3 px-2 text-sm font-semibold text-foreground">
-                    G{i + 1}
+                  <th key={i}>
+                    <button
+                      onClick={() => handleSort(`game-${i}` as SortField)}
+                      className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      G{i + 1}
+                      <SortIcon field={`game-${i}` as SortField} />
+                    </button>
                   </th>
                 ))}
-                <th className="text-center py-3 px-2 text-sm font-semibold text-foreground">Total</th>
-                <th className="text-left py-3 px-2 text-sm font-semibold text-foreground">Pos</th>
-                <th className="text-left py-3 px-2 text-sm font-semibold text-foreground">Pts</th>
+                <th>
+                  <button
+                    onClick={() => handleSort('total')}
+                    className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    Total
+                    <SortIcon field="total" />
+                  </button>
+                </th>
+                <th>
+                  <button
+                    onClick={() => handleSort('position')}
+                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    Pos
+                    <SortIcon field="position" />
+                  </button>
+                </th>
+                <th>
+                  <button
+                    onClick={() => handleSort('points')}
+                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
+                  >
+                    Pts
+                    <SortIcon field="points" />
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
-              {participations.map((participation) => {
+              {sortedParticipations.map((participation) => {
                 const displayScores = participation.gameScores || [];
 
                 return (
