@@ -6,6 +6,7 @@ import {
   useRejectApplication,
 } from '../../hooks/useTournaments';
 import { ApplicationStatus } from '../../types/tournament';
+import { getApplicationStatusBadgeColor } from '../../lib/utils';
 
 interface TournamentApplicationsProps {
   tournamentId: string;
@@ -25,8 +26,9 @@ export const TournamentApplications: React.FC<TournamentApplicationsProps> = ({
         onSuccess: () => {
           toast.success(`${playerName} has been added to the tournament!`);
         },
-        onError: (error: any) => {
-          toast.error(error.response?.data?.message || 'Failed to approve application');
+        onError: (error) => {
+          const errorMessage = (error as any).response?.data?.message || 'Failed to approve application';
+          toast.error(errorMessage);
         },
       }
     );
@@ -39,24 +41,12 @@ export const TournamentApplications: React.FC<TournamentApplicationsProps> = ({
         onSuccess: () => {
           toast.success(`${playerName}'s application has been rejected.`);
         },
-        onError: (error: any) => {
-          toast.error(error.response?.data?.message || 'Failed to reject application');
+        onError: (error) => {
+          const errorMessage = (error as any).response?.data?.message || 'Failed to reject application';
+          toast.error(errorMessage);
         },
       }
     );
-  };
-
-  const getStatusBadgeColor = (status: ApplicationStatus) => {
-    switch (status) {
-      case ApplicationStatus.PENDING:
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case ApplicationStatus.APPROVED:
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      case ApplicationStatus.REJECTED:
-        return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
-    }
   };
 
   if (isLoading) {
@@ -155,7 +145,7 @@ export const TournamentApplications: React.FC<TournamentApplicationsProps> = ({
                   </p>
                 </div>
                 <span
-                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusBadgeColor(application.status)}`}
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getApplicationStatusBadgeColor(application.status)}`}
                 >
                   {application.status}
                 </span>

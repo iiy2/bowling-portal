@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { type Tournament, TournamentStatus } from '../../types/tournament';
+import { type Tournament, type TournamentFormData, TournamentStatus } from '../../types/tournament';
 import { useSeasons } from '../../hooks/useSeasons';
 
 interface TournamentFormProps {
   tournament?: Tournament;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: TournamentFormData) => void;
   isLoading: boolean;
   error?: Error | null;
 }
@@ -60,21 +60,15 @@ export const TournamentForm: React.FC<TournamentFormProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const submitData: any = {
+    const submitData: TournamentFormData = {
       name: formData.name,
       date: new Date(formData.date).toISOString(),
       location: formData.location,
       seasonId: formData.seasonId,
       status: formData.status,
+      maxParticipants: formData.maxParticipants ? parseInt(formData.maxParticipants) : undefined,
+      description: formData.description || undefined,
     };
-
-    if (formData.maxParticipants) {
-      submitData.maxParticipants = parseInt(formData.maxParticipants);
-    }
-
-    if (formData.description) {
-      submitData.description = formData.description;
-    }
 
     onSubmit(submitData);
   };

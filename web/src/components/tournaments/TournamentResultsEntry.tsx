@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useRef } from 'react';
 import toast from 'react-hot-toast';
-import type { TournamentParticipation } from '../../types/tournament';
+import { api } from '../../lib/api';
+import { calculateNumberOfGames } from '../../lib/utils';
+import type { TournamentParticipation, TournamentParticipationUpdateData } from '../../types/tournament';
 
 interface TournamentResultsEntryProps {
   tournamentId: string;
@@ -17,27 +19,22 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
   const saveTimeoutRef = useRef<{ [key: string]: ReturnType<typeof setTimeout> }>({});
 
   // Calculate number of games based on number of players
-  // 8 or fewer: 6 games, 9-12: 7 games, 13+: 8 games (max)
-  const numberOfGames = useMemo(() => {
-    const playerCount = participations.length;
-    if (playerCount <= 8) return 6;
-    if (playerCount <= 12) return 7;
-    return 8;
-  }, [participations.length]);
+  const numberOfGames = useMemo(() =>
+    calculateNumberOfGames(participations.length),
+    [participations.length]
+  );
 
   const saveField = async (
     participationId: string,
     participation: TournamentParticipation,
     field: string,
-    value: any
+    value: string | number
   ) => {
     setSavingCell(`${participationId}-${field}`);
 
     try {
-      const token = localStorage.getItem('accessToken');
-
       // Prepare the data to send
-      let dataToSend: any = {
+      let dataToSend: TournamentParticipationUpdateData = {
         finalPosition: participation.finalPosition,
         handicap: participation.handicap,
         ratingPointsEarned: participation.ratingPointsEarned,
@@ -50,11 +47,11 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
 
       // Update the specific field
       if (field === 'handicap' || field === 'finalPosition' || field === 'ratingPointsEarned') {
-        dataToSend[field] = value ? parseFloat(value) : undefined;
+        dataToSend[field] = value ? parseFloat(String(value)) : undefined;
       } else if (field.startsWith('game-')) {
         const gameIndex = parseInt(field.split('-')[1]);
         const gameScores = [...(participation.gameScores || Array(numberOfGames).fill(0))];
-        gameScores[gameIndex] = value ? parseInt(value) : 0;
+        gameScores[gameIndex] = value ? parseInt(String(value)) : 0;
         dataToSend.gameScores = gameScores;
 
         // Validate minimum 6 games
@@ -66,26 +63,15 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
         // }
       }
 
-      const response = await fetch(
-        `http://localhost:3000/tournaments/${tournamentId}/participants/${participationId}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(dataToSend),
-        }
+      await api.patch(
+        `/tournaments/${tournamentId}/participants/${participationId}`,
+        dataToSend
       );
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update');
-      }
-
       onResultsUpdated();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to save');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save';
+      toast.error(errorMessage);
     } finally {
       setSavingCell(null);
     }

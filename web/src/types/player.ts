@@ -56,3 +56,11 @@ export interface PlayerQueryParams {
   page?: number;
   limit?: number;
 }
+
+export interface PlayerFormData {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  isActive: boolean;
+}

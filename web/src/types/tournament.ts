@@ -101,3 +101,20 @@ export interface TournamentApplication {
   player?: Player;
   tournament?: Tournament;
 }
+
+export interface TournamentFormData {
+  name: string;
+  date: string;
+  location: string;
+  seasonId: string;
+  status?: TournamentStatus;
+  maxParticipants?: number;
+  description?: string;
+}
+
+export interface TournamentParticipationUpdateData {
+  finalPosition?: number;
+  handicap?: number;
+  ratingPointsEarned?: number;
+  gameScores?: number[];
+}

@@ -4,6 +4,7 @@ import { useTournaments } from '../../hooks/useTournaments';
 import { useSeasons } from '../../hooks/useSeasons';
 import { useAuthStore } from '../../store/useAuthStore';
 import { TournamentStatus, type TournamentQueryParams } from '../../types/tournament';
+import { getTournamentStatusBadgeColor } from '../../lib/utils';
 
 export const TournamentsPage: React.FC = () => {
   const { user } = useAuthStore();
@@ -16,19 +17,6 @@ export const TournamentsPage: React.FC = () => {
 
   const { data: tournamentsData, isLoading } = useTournaments(filters);
   const { data: seasons } = useSeasons();
-
-  const getStatusBadgeColor = (status: TournamentStatus) => {
-    switch (status) {
-      case TournamentStatus.UPCOMING:
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case TournamentStatus.ONGOING:
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case TournamentStatus.COMPLETED:
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -45,7 +33,7 @@ export const TournamentsPage: React.FC = () => {
     });
   };
 
-  const handleFilterChange = (key: keyof TournamentQueryParams, value: any) => {
+  const handleFilterChange = (key: keyof TournamentQueryParams, value: string | number | undefined) => {
     setFilters((prev) => ({
       ...prev,
       [key]: value,
@@ -170,7 +158,7 @@ export const TournamentsPage: React.FC = () => {
                     {tournament.name}
                   </h3>
                   <span
-                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getStatusBadgeColor(tournament.status)}`}
+                    className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${getTournamentStatusBadgeColor(tournament.status)}`}
                   >
                     {tournament.status}
                   </span>

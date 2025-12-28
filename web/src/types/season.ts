@@ -44,3 +44,11 @@ export interface UpdateSeasonData extends Partial<CreateSeasonData> {}
 export interface UpdateRatingConfigData {
   pointsDistribution: Record<string, number>;
 }
+
+export interface SeasonFormData {
+  name: string;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  pointsDistribution?: Record<string, number>;
+}

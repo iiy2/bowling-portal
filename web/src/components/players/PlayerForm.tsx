@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Player } from '../../types/player';
+import type { Player, PlayerFormData } from '../../types/player';
 
 interface PlayerFormProps {
   player?: Player;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: PlayerFormData) => void;
   isLoading: boolean;
   error?: Error | null;
 }

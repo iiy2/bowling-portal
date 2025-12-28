@@ -53,7 +53,7 @@ docker compose up -d
 
 3. **Setup Backend**
 ```bash
-cd bowling-league-api
+cd api
 npm install
 
 # Generate Prisma client

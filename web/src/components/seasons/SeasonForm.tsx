@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import type { Season } from '../../types/season';
+import type { Season, SeasonFormData } from '../../types/season';
 
 interface SeasonFormProps {
   season?: Season;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: SeasonFormData) => void;
   isLoading: boolean;
   error?: Error | null;
 }

@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { calculateNumberOfGames } from '../../lib/utils';
 import type { TournamentParticipation } from '../../types/tournament';
 
 interface TournamentResultsTableProps {
@@ -17,13 +18,10 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
   });
 
   // Calculate number of games based on number of players
-  // 8 or fewer: 6 games, 9-12: 7 games, 13+: 8 games (max)
-  const numberOfGames = useMemo(() => {
-    const playerCount = participations.length;
-    if (playerCount <= 8) return 6;
-    if (playerCount <= 12) return 7;
-    return 8;
-  }, [participations.length]);
+  const numberOfGames = useMemo(() =>
+    calculateNumberOfGames(participations.length),
+    [participations.length]
+  );
 
   return (
     <div className="rounded-lg border border-border bg-card p-6">

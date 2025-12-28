@@ -11,6 +11,7 @@ import { TournamentRegistration } from '../../components/tournaments/TournamentR
 import { TournamentApplications } from '../../components/tournaments/TournamentApplications';
 import { TournamentResultsEntry } from '../../components/tournaments/TournamentResultsEntry';
 import { TournamentResultsTable } from '../../components/tournaments/TournamentResultsTable';
+import { getTournamentStatusBadgeColor } from '../../lib/utils';
 
 export const TournamentDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -40,19 +41,6 @@ export const TournamentDetailPage: React.FC = () => {
     if (!tournament) return;
 
     updateStatus.mutate({ id: id!, status });
-  };
-
-  const getStatusBadgeColor = (status: TournamentStatus) => {
-    switch (status) {
-      case TournamentStatus.UPCOMING:
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400';
-      case TournamentStatus.ONGOING:
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400';
-      case TournamentStatus.COMPLETED:
-        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400';
-    }
   };
 
   const formatDate = (dateString: string) => {
@@ -106,7 +94,7 @@ export const TournamentDetailPage: React.FC = () => {
             <div className="flex items-center gap-3">
               <h1 className="text-3xl font-bold text-foreground">{tournament.name}</h1>
               <span
-                className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${getStatusBadgeColor(tournament.status)}`}
+                className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-medium ${getTournamentStatusBadgeColor(tournament.status)}`}
               >
                 {tournament.status}
               </span>
