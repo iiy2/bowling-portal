@@ -10,7 +10,7 @@ interface TournamentResultsEntryProps {
   onResultsUpdated: () => void;
 }
 
-type SortField = 'player' | 'handicap' | 'total' | 'position' | 'points' | 'average' | `game-${number}`;
+type SortField = 'player' | 'handicap' | 'total' | 'totalWithHandicap' | 'position' | 'points' | 'average' | 'gapTo4th' | `game-${number}`;
 type SortDirection = 'asc' | 'desc';
 
 export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
@@ -45,6 +45,15 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
       setSortDirection('asc');
     }
   };
+
+  // Calculate 4th place score for gap calculation
+  const fourthPlaceScore = useMemo(() => {
+    const scores = participations
+      .map(p => (p.totalScore || 0) + ((p.handicap || 0) * numberOfGames))
+      .filter(score => score > 0)
+      .sort((a, b) => b - a);
+    return scores[3] || 0; // 4th place (index 3)
+  }, [participations, numberOfGames]);
 
   // Sort participations based on current sort field and direction
   const sortedParticipations = useMemo(() => {
@@ -97,6 +106,25 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
           compareResult = avgA - avgB;
           break;
 
+        case 'totalWithHandicap':
+          // Nulls last
+          if (a.totalScore === null && b.totalScore === null) return 0;
+          if (a.totalScore === null) return 1;
+          if (b.totalScore === null) return -1;
+          const totalA = (a.totalScore || 0) + ((a.handicap || 0) * numberOfGames);
+          const totalB = (b.totalScore || 0) + ((b.handicap || 0) * numberOfGames);
+          compareResult = totalA - totalB;
+          break;
+
+        case 'gapTo4th':
+          // Calculate gap to 4th place for each player
+          const scoreA = (a.totalScore || 0) + ((a.handicap || 0) * numberOfGames);
+          const scoreB = (b.totalScore || 0) + ((b.handicap || 0) * numberOfGames);
+          const gapA = fourthPlaceScore - scoreA;
+          const gapB = fourthPlaceScore - scoreB;
+          compareResult = gapA - gapB;
+          break;
+
         default:
           // Handle game-specific sorting
           if (sortField.startsWith('game-')) {
@@ -111,7 +139,7 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
     });
 
     return sorted;
-  }, [participations, sortField, sortDirection]);
+  }, [participations, sortField, sortDirection, fourthPlaceScore, numberOfGames]);
 
   const SortIcon: React.FC<{ field: SortField }> = ({ field }) => {
     if (sortField !== field) {
@@ -278,6 +306,24 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                     <SortIcon field="total" />
                   </button>
                 </th>
+                <th>
+                  <button
+                    onClick={() => handleSort('totalWithHandicap')}
+                    className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    Total+HC
+                    <SortIcon field="totalWithHandicap" />
+                  </button>
+                </th>
+                <th>
+                  <button
+                    onClick={() => handleSort('gapTo4th')}
+                    className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    Gap to 4th
+                    <SortIcon field="gapTo4th" />
+                  </button>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -342,6 +388,46 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                     <td className="py-3 px-2 text-center">
                       <span className="font-semibold text-foreground text-sm">
                         {participation.totalScore || '-'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 text-center">
+                      <span className="font-semibold text-foreground text-sm">
+                        {(() => {
+                          const total = participation.totalScore || 0;
+                          const handicap = participation.handicap || 0;
+                          if (total === 0) return '-';
+                          return total + (handicap * numberOfGames);
+                        })()}
+                      </span>
+                    </td>
+                    <td className="py-3 px-2 text-center">
+                      <span className={`text-sm font-medium ${
+                        index < 4
+                          ? 'text-green-700 dark:text-green-400'
+                          : 'text-red-700 dark:text-red-400'
+                      }`}>
+                        {(() => {
+                          const total = participation.totalScore || 0;
+                          const handicap = participation.handicap || 0;
+                          const playerScore = total + (handicap * numberOfGames);
+
+                          if (total === 0) return '-';
+
+                          const gap = playerScore - fourthPlaceScore;
+
+                          // 4th place
+                          if (index === 3) {
+                            return '0';
+                          }
+
+                          // Top 3 (above 4th place)
+                          if (index < 3) {
+                            return `+${gap}`;
+                          }
+
+                          // Below 4th place
+                          return gap.toString();
+                        })()}
                       </span>
                     </td>
                   </tr>
