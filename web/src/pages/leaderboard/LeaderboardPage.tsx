@@ -1,9 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useActiveLeaderboard } from '../../hooks/useLeaderboard';
 import { LeaderboardTable } from '../../components/leaderboard/LeaderboardTable';
 
+type LeaderboardView = 'total' | 'average';
+
 export const LeaderboardPage: React.FC = () => {
+  const [activeView, setActiveView] = useState<LeaderboardView>('total');
   const { data, isLoading, error } = useActiveLeaderboard();
 
   if (isLoading) {
@@ -46,6 +49,17 @@ export const LeaderboardPage: React.FC = () => {
     );
   }
 
+  // Create sorted leaderboards based on view
+  const sortedLeaderboard = activeView === 'total'
+    ? [...data.leaderboard].sort((a, b) => b.totalPoints - a.totalPoints)
+    : [...data.leaderboard].sort((a, b) => b.averagePosition - a.averagePosition); // Higher average score is better
+
+  // Re-assign ranks based on current sort
+  const rankedLeaderboard = sortedLeaderboard.map((entry, index) => ({
+    ...entry,
+    rank: index + 1,
+  }));
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
@@ -55,9 +69,33 @@ export const LeaderboardPage: React.FC = () => {
         </p>
       </div>
 
+      <div className="mb-6 flex gap-2 border-b border-border">
+        <button
+          onClick={() => setActiveView('total')}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeView === 'total'
+              ? 'border-b-2 border-primary text-primary'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Total Points
+        </button>
+        <button
+          onClick={() => setActiveView('average')}
+          className={`px-4 py-2 text-sm font-medium transition-colors ${
+            activeView === 'average'
+              ? 'border-b-2 border-primary text-primary'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Average Score
+        </button>
+      </div>
+
       <LeaderboardTable
-        leaderboard={data.leaderboard}
+        leaderboard={rankedLeaderboard}
         seasonName={data.season.name}
+        view={activeView}
       />
 
       <div className="mt-6 rounded-lg border border-border bg-card p-4">

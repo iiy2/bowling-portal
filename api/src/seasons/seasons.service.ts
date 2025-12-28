@@ -375,6 +375,10 @@ export class SeasonsService {
         player: any;
         totalPoints: number;
         tournamentsPlayed: number;
+        totalPosition: number;
+        positionCount: number;
+        totalGameScore: number;
+        totalGamesPlayed: number;
         tournaments: Array<{
           tournamentId: string;
           tournamentName: string;
@@ -394,6 +398,10 @@ export class SeasonsService {
           player: participation.player,
           totalPoints: 0,
           tournamentsPlayed: 0,
+          totalPosition: 0,
+          positionCount: 0,
+          totalGameScore: 0,
+          totalGamesPlayed: 0,
           tournaments: [],
         });
       }
@@ -401,6 +409,25 @@ export class SeasonsService {
       const playerData = playerRatings.get(playerId)!;
       playerData.totalPoints += points;
       playerData.tournamentsPlayed += 1;
+
+      // Track position for average calculation
+      if (participation.finalPosition !== null) {
+        playerData.totalPosition += participation.finalPosition;
+        playerData.positionCount += 1;
+      }
+
+      // Track game scores for average calculation (only count games that were actually played)
+      if (participation.gameScores && Array.isArray(participation.gameScores)) {
+        const gameScores = participation.gameScores as number[];
+        gameScores.forEach((score) => {
+          // Only count games with a score greater than 0 (game was actually played)
+          if (typeof score === 'number' && !isNaN(score) && score > 0) {
+            playerData.totalGameScore += score;
+            playerData.totalGamesPlayed += 1;
+          }
+        });
+      }
+
       playerData.tournaments.push({
         tournamentId: participation.tournament.id,
         tournamentName: participation.tournament.name,
@@ -420,6 +447,7 @@ export class SeasonsService {
         totalPoints: data.totalPoints,
         tournamentsPlayed: data.tournamentsPlayed,
         averagePoints: data.tournamentsPlayed > 0 ? data.totalPoints / data.tournamentsPlayed : 0,
+        averagePosition: data.totalGamesPlayed > 0 ? data.totalGameScore / data.totalGamesPlayed : 0,
         tournaments: data.tournaments,
       }))
       .sort((a, b) => b.totalPoints - a.totalPoints)

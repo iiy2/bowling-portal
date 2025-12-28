@@ -5,11 +5,13 @@ import type { LeaderboardEntry } from '../../types/leaderboard';
 interface LeaderboardTableProps {
   leaderboard: LeaderboardEntry[];
   seasonName: string;
+  view?: 'total' | 'average';
 }
 
 export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
   leaderboard,
   seasonName,
+  view = 'total',
 }) => {
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
 
@@ -48,7 +50,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                 Tournaments
               </th>
               <th className="text-center py-3 px-2 text-sm font-semibold text-foreground">
-                Avg Points
+                {view === 'total' ? 'Avg Points' : 'Avg Score'}
               </th>
               <th className="text-center py-3 px-2 text-sm font-semibold text-foreground">
                 Details
@@ -93,7 +95,12 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                       {entry.tournamentsPlayed}
                     </td>
                     <td className="py-3 px-2 text-center text-foreground">
-                      {entry.averagePoints.toFixed(1)}
+                      {view === 'total'
+                        ? entry.averagePoints.toFixed(1)
+                        : entry.averagePosition > 0
+                          ? Math.round(entry.averagePosition)
+                          : 'N/A'
+                      }
                     </td>
                     <td className="py-3 px-2 text-center">
                       <button

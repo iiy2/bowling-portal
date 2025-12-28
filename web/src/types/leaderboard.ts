@@ -6,6 +6,7 @@ export interface LeaderboardEntry {
   totalPoints: number;
   tournamentsPlayed: number;
   averagePoints: number;
+  averagePosition: number;
   tournaments: Array<{
     tournamentId: string;
     tournamentName: string;
