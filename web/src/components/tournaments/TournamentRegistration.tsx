@@ -20,31 +20,65 @@ export const TournamentRegistration: React.FC<TournamentRegistrationProps> = ({
 }) => {
   const { user } = useAuthStore();
   const [selectedPlayerId, setSelectedPlayerId] = useState('');
-  const { data: playersData } = usePlayers({});
+  const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+  const isAdmin = user?.role === 'ADMIN';
+
+  // Fetch all players for admin (no isActive filter), regular users get default filtering
+  const { data: playersData } = usePlayers(isAdmin ? { limit: 1000 } : {});
   const applyToTournament = useApplyToTournament();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedPlayerId) return;
 
-    const isAdminUser = user?.role === 'ADMIN';
+    if (isAdmin) {
+      // Admin: handle multiple players
+      if (selectedPlayerIds.length === 0) return;
 
-    applyToTournament.mutate(
-      { tournamentId, playerId: selectedPlayerId },
-      {
-        onSuccess: () => {
-          setSelectedPlayerId('');
-          if (isAdminUser) {
-            toast.success('Player added to tournament successfully!');
-          } else {
-            toast.success('Application submitted! Waiting for admin approval.');
+      let successCount = 0;
+      let failCount = 0;
+
+      // Submit applications sequentially
+      const submitApplications = async () => {
+        for (const playerId of selectedPlayerIds) {
+          try {
+            await applyToTournament.mutateAsync({ tournamentId, playerId });
+            successCount++;
+          } catch (error: any) {
+            failCount++;
           }
-        },
-        onError: (error: any) => {
-          toast.error(error.response?.data?.message || 'Failed to submit application');
-        },
-      }
-    );
+        }
+
+        // Show summary notification
+        if (successCount > 0 && failCount === 0) {
+          toast.success(`Successfully added ${successCount} player${successCount > 1 ? 's' : ''} to tournament!`);
+        } else if (successCount > 0 && failCount > 0) {
+          toast.success(`Added ${successCount} player${successCount > 1 ? 's' : ''}, ${failCount} failed`);
+        } else {
+          toast.error('Failed to add players');
+        }
+
+        // Reset selection
+        setSelectedPlayerIds([]);
+      };
+
+      submitApplications();
+    } else {
+      // Regular user: handle single player
+      if (!selectedPlayerId) return;
+
+      applyToTournament.mutate(
+        { tournamentId, playerId: selectedPlayerId },
+        {
+          onSuccess: () => {
+            setSelectedPlayerId('');
+            toast.success('Application submitted! Waiting for admin approval.');
+          },
+          onError: (error: any) => {
+            toast.error(error.response?.data?.message || 'Failed to submit application');
+          },
+        }
+      );
+    }
   };
 
   if (!user) {
@@ -65,8 +99,6 @@ export const TournamentRegistration: React.FC<TournamentRegistrationProps> = ({
     );
   }
 
-  const isAdmin = user?.role === 'ADMIN';
-
   // Get IDs of players who are already participating or have pending applications
   const participatingPlayerIds = new Set(
     (tournament.participations || []).map((p) => p.playerId)
@@ -79,10 +111,10 @@ export const TournamentRegistration: React.FC<TournamentRegistrationProps> = ({
     ...pendingApplicationPlayerIds,
   ]);
 
-  // Admin can see all active players (excluding those already in tournament), regular users see only their own
+  // Admin can see all players (excluding those already in tournament), regular users see only their own
   const availablePlayers = isAdmin
     ? (playersData?.data || []).filter(
-        (player) => player.isActive && !excludedPlayerIds.has(player.id)
+        (player) => !excludedPlayerIds.has(player.id)
       )
     : (playersData?.data || []).filter(
         (player) =>
@@ -132,12 +164,55 @@ export const TournamentRegistration: React.FC<TournamentRegistrationProps> = ({
       </h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="player" className="block text-sm font-medium text-foreground mb-1">
-            {isAdmin ? 'Select Player' : 'Player'}
+          <label className="block text-sm font-medium text-foreground mb-2">
+            {isAdmin ? 'Select Players' : 'Player'}
           </label>
           {!isAdmin && availablePlayers.length === 1 ? (
             <div className="rounded-md border border-input bg-muted/50 px-3 py-2 text-foreground">
               {selectedPlayer.firstName} {selectedPlayer.lastName}
+            </div>
+          ) : isAdmin ? (
+            <div className="rounded-md border border-input bg-background max-h-80 overflow-y-auto">
+              {availablePlayers.map((player) => {
+                const isSelected = selectedPlayerIds.includes(player.id);
+                return (
+                  <label
+                    key={player.id}
+                    className={`flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border last:border-b-0 ${!player.isActive ? 'opacity-60' : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedPlayerIds([...selectedPlayerIds, player.id]);
+                        } else {
+                          setSelectedPlayerIds(selectedPlayerIds.filter(id => id !== player.id));
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-input text-primary focus:ring-primary focus:ring-offset-0"
+                    />
+                    <span className="flex-1 text-sm text-foreground">
+                      {player.firstName} {player.lastName}
+                      {!player.isActive && (
+                        <span className="ml-2 text-xs text-destructive font-medium">
+                          (Inactive)
+                        </span>
+                      )}
+                      {player.userId && (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          ({player.user?.email || 'Unknown'})
+                        </span>
+                      )}
+                      {!player.userId && (
+                        <span className="ml-2 text-xs text-muted-foreground">
+                          (Unassigned)
+                        </span>
+                      )}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
           ) : (
             <select
@@ -151,18 +226,22 @@ export const TournamentRegistration: React.FC<TournamentRegistrationProps> = ({
               {availablePlayers.map((player) => (
                 <option key={player.id} value={player.id}>
                   {player.firstName} {player.lastName}
-                  {player.userId && !isAdmin ? '' : player.userId ? ` (User: ${player.user?.email || 'Unknown'})` : ' (Unassigned)'}
                 </option>
               ))}
             </select>
           )}
+          {isAdmin && selectedPlayerIds.length > 0 && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              {selectedPlayerIds.length} player{selectedPlayerIds.length > 1 ? 's' : ''} selected
+            </p>
+          )}
         </div>
         <button
           type="submit"
-          disabled={!selectedPlayerId || applyToTournament.isPending}
+          disabled={(isAdmin ? selectedPlayerIds.length === 0 : !selectedPlayerId) || applyToTournament.isPending}
           className="w-full rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {applyToTournament.isPending ? 'Submitting...' : isAdmin ? 'Add Player' : 'Submit Application'}
+          {applyToTournament.isPending ? 'Submitting...' : isAdmin ? `Add Player${selectedPlayerIds.length > 1 ? 's' : ''}` : 'Submit Application'}
         </button>
       </form>
     </div>

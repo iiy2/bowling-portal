@@ -75,4 +75,8 @@ export const tournamentService = {
     const response = await api.get<TournamentParticipation[]>(`/tournaments/${tournamentId}/participants`);
     return response.data;
   },
+
+  removeParticipant: async (tournamentId: string, participationId: string): Promise<void> => {
+    await api.delete(`/tournaments/${tournamentId}/participations/${participationId}`);
+  },
 };

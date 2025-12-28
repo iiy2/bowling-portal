@@ -136,3 +136,16 @@ export const useTournamentParticipants = (tournamentId: string) => {
     enabled: !!tournamentId,
   });
 };
+
+export const useRemoveParticipant = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ tournamentId, participationId }: { tournamentId: string; participationId: string }) =>
+      tournamentService.removeParticipant(tournamentId, participationId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['tournament', variables.tournamentId] });
+      queryClient.invalidateQueries({ queryKey: ['tournament-participants', variables.tournamentId] });
+    },
+  });
+};

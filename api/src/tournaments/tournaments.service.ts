@@ -637,4 +637,35 @@ export class TournamentsService {
       },
     });
   }
+
+  async removeParticipant(tournamentId: string, participationId: string) {
+    // Verify tournament exists
+    const tournament = await this.prisma.tournament.findUnique({
+      where: { id: tournamentId },
+    });
+
+    if (!tournament) {
+      throw new NotFoundException(`Tournament with ID ${tournamentId} not found`);
+    }
+
+    // Verify participation exists and belongs to tournament
+    const participation = await this.prisma.tournamentParticipation.findUnique({
+      where: { id: participationId },
+    });
+
+    if (!participation) {
+      throw new NotFoundException(`Participation with ID ${participationId} not found`);
+    }
+
+    if (participation.tournamentId !== tournamentId) {
+      throw new BadRequestException('Participation does not belong to this tournament');
+    }
+
+    // Delete the participation
+    await this.prisma.tournamentParticipation.delete({
+      where: { id: participationId },
+    });
+
+    return { message: 'Participant removed successfully' };
+  }
 }

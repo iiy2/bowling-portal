@@ -183,4 +183,20 @@ export class TournamentsController {
   ) {
     return this.tournamentsService.updateParticipationResult(tournamentId, participationId, updateData);
   }
+
+  @Delete(':id/participations/:participationId')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Remove participant from tournament (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Participant removed successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
+  @ApiResponse({ status: 404, description: 'Tournament or participation not found' })
+  removeParticipant(
+    @Param('id') tournamentId: string,
+    @Param('participationId') participationId: string,
+  ) {
+    return this.tournamentsService.removeParticipant(tournamentId, participationId);
+  }
 }

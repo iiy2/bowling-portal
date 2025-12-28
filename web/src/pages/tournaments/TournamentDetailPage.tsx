@@ -11,6 +11,7 @@ import { TournamentRegistration } from '../../components/tournaments/TournamentR
 import { TournamentApplications } from '../../components/tournaments/TournamentApplications';
 import { TournamentResultsEntry } from '../../components/tournaments/TournamentResultsEntry';
 import { TournamentResultsTable } from '../../components/tournaments/TournamentResultsTable';
+import { TournamentParticipantsList } from '../../components/tournaments/TournamentParticipantsList';
 import { getTournamentStatusBadgeColor, formatOrdinal } from '../../lib/utils';
 
 export const TournamentDetailPage: React.FC = () => {
@@ -271,6 +272,15 @@ export const TournamentDetailPage: React.FC = () => {
 
         {isAdmin && tournament.status === TournamentStatus.UPCOMING && (
           <TournamentApplications tournamentId={id!} />
+        )}
+
+        {tournament.participations && tournament.participations.length > 0 && tournament.status === TournamentStatus.UPCOMING && (
+          <TournamentParticipantsList
+            tournamentId={id!}
+            participations={tournament.participations}
+            isAdmin={isAdmin}
+            onParticipantRemoved={() => refetch()}
+          />
         )}
 
         {isAdmin && tournament.status === TournamentStatus.ONGOING && tournament.participations && (
