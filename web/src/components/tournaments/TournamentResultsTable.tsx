@@ -173,14 +173,20 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
               {sortedParticipations.map((participation, index) => {
                 const hasResults = participation.finalPosition !== null || participation.totalScore !== null;
                 const gameScores = participation.gameScores || [];
+                const isTopFour = index < 4;
+                const isCutLine = index === 4;
 
                 return (
                   <tr
                     key={participation.id}
-                    className={`border-b border-border ${!hasResults ? 'opacity-60' : ''}`}
+                    className={`border-b border-border ${!hasResults ? 'opacity-60' : ''} ${isCutLine ? 'border-t-4 border-t-primary' : ''}`}
                   >
                     <td className="py-3 px-2 sticky left-0 bg-card">
-                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-bold">
+                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full font-bold ${
+                        isTopFour
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                          : 'bg-primary/10 text-primary'
+                      }`}>
                         {index + 1}
                       </span>
                     </td>
