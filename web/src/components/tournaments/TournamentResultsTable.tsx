@@ -1,6 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { calculateNumberOfGames } from '../../lib/utils';
 import type { TournamentParticipation } from '../../types/tournament';
+
+type SortField = 'position' | 'player' | 'handicap' | 'total' | 'rating' | `game-${number}`;
+type SortDirection = 'asc' | 'desc';
 
 interface TournamentResultsTableProps {
   participations: TournamentParticipation[];
@@ -9,19 +12,90 @@ interface TournamentResultsTableProps {
 export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
   participations,
 }) => {
-  // Sort by final position (nulls last)
-  const sortedParticipations = [...participations].sort((a, b) => {
-    if (a.finalPosition === null && b.finalPosition === null) return 0;
-    if (a.finalPosition === null) return 1;
-    if (b.finalPosition === null) return -1;
-    return (a.finalPosition || 0) - (b.finalPosition || 0);
-  });
+  const [sortField, setSortField] = useState<SortField>('position');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   // Calculate number of games based on number of players
   const numberOfGames = useMemo(() =>
     calculateNumberOfGames(participations.length),
     [participations.length]
   );
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      // Toggle direction if clicking same field
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // Default to ascending for new field
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  // Sort participations based on current sort field and direction
+  const sortedParticipations = useMemo(() => {
+    const sorted = [...participations].sort((a, b) => {
+      let compareResult = 0;
+
+      switch (sortField) {
+        case 'position':
+          // Nulls last
+          if (a.finalPosition === null && b.finalPosition === null) return 0;
+          if (a.finalPosition === null) return 1;
+          if (b.finalPosition === null) return -1;
+          compareResult = (a.finalPosition || 0) - (b.finalPosition || 0);
+          break;
+
+        case 'player':
+          const nameA = `${a.player?.firstName || ''} ${a.player?.lastName || ''}`.trim();
+          const nameB = `${b.player?.firstName || ''} ${b.player?.lastName || ''}`.trim();
+          compareResult = nameA.localeCompare(nameB);
+          break;
+
+        case 'handicap':
+          const hcA = a.handicap ?? 0;
+          const hcB = b.handicap ?? 0;
+          compareResult = hcA - hcB;
+          break;
+
+        case 'total':
+          const totalA = a.totalScore ?? 0;
+          const totalB = b.totalScore ?? 0;
+          compareResult = totalA - totalB;
+          break;
+
+        case 'rating':
+          const ratingA = a.ratingPointsEarned ?? 0;
+          const ratingB = b.ratingPointsEarned ?? 0;
+          compareResult = ratingA - ratingB;
+          break;
+
+        default:
+          // Handle game-specific sorting
+          if (sortField.startsWith('game-')) {
+            const gameIndex = parseInt(sortField.split('-')[1]);
+            const scoreA = (a.gameScores?.[gameIndex] ?? 0);
+            const scoreB = (b.gameScores?.[gameIndex] ?? 0);
+            compareResult = scoreA - scoreB;
+          }
+      }
+
+      return sortDirection === 'asc' ? compareResult : -compareResult;
+    });
+
+    return sorted;
+  }, [participations, sortField, sortDirection]);
+
+  const SortIcon: React.FC<{ field: SortField }> = ({ field }) => {
+    if (sortField !== field) {
+      return <span className="text-muted-foreground opacity-0 group-hover:opacity-50">↕</span>;
+    }
+    return (
+      <span className="text-primary">
+        {sortDirection === 'asc' ? '↑' : '↓'}
+      </span>
+    );
+  };
 
   return (
     <div className="rounded-lg border border-border bg-card p-6">
@@ -34,19 +108,61 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                <th className="text-left py-3 px-2 text-sm font-semibold text-foreground sticky left-0 bg-card">
-                  Position
+                <th className="sticky left-0 bg-card">
+                  <button
+                    onClick={() => handleSort('position')}
+                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1"
+                  >
+                    Position
+                    <SortIcon field="position" />
+                  </button>
                 </th>
-                <th className="text-left py-3 px-2 text-sm font-semibold text-foreground">Player</th>
-                <th className="text-left py-3 px-2 text-sm font-semibold text-foreground">HC</th>
+                <th>
+                  <button
+                    onClick={() => handleSort('player')}
+                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1"
+                  >
+                    Player
+                    <SortIcon field="player" />
+                  </button>
+                </th>
+                <th>
+                  <button
+                    onClick={() => handleSort('handicap')}
+                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary transition-colors flex items-center gap-1"
+                  >
+                    HC
+                    <SortIcon field="handicap" />
+                  </button>
+                </th>
                 {numberOfGames > 0 && Array.from({ length: numberOfGames }, (_, i) => (
-                  <th key={i} className="text-center py-3 px-2 text-sm font-semibold text-foreground">
-                    G{i + 1}
+                  <th key={i}>
+                    <button
+                      onClick={() => handleSort(`game-${i}` as SortField)}
+                      className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary transition-colors flex items-center justify-center gap-1"
+                    >
+                      G{i + 1}
+                      <SortIcon field={`game-${i}` as SortField} />
+                    </button>
                   </th>
                 ))}
-                <th className="text-right py-3 px-2 text-sm font-semibold text-foreground">Total</th>
-                <th className="text-right py-3 px-2 text-sm font-semibold text-foreground sticky right-0 bg-card">
-                  Rating Points
+                <th>
+                  <button
+                    onClick={() => handleSort('total')}
+                    className="group w-full text-right py-3 px-2 text-sm font-semibold text-foreground hover:text-primary transition-colors flex items-center justify-end gap-1"
+                  >
+                    Total
+                    <SortIcon field="total" />
+                  </button>
+                </th>
+                <th className="sticky right-0 bg-card">
+                  <button
+                    onClick={() => handleSort('rating')}
+                    className="group w-full text-right py-3 px-2 text-sm font-semibold text-foreground hover:text-primary transition-colors flex items-center justify-end gap-1"
+                  >
+                    Rating Points
+                    <SortIcon field="rating" />
+                  </button>
                 </th>
               </tr>
             </thead>
@@ -110,11 +226,16 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
         </div>
       )}
 
-      {participations.some(p => p.finalPosition === null && p.totalScore === null) && (
-        <p className="mt-4 text-xs text-muted-foreground">
-          Players without results are shown with reduced opacity
+      <div className="mt-4 space-y-1">
+        <p className="text-xs text-muted-foreground">
+          Click column headers to sort results
         </p>
-      )}
+        {participations.some(p => p.finalPosition === null && p.totalScore === null) && (
+          <p className="text-xs text-muted-foreground">
+            Players without results are shown with reduced opacity
+          </p>
+        )}
+      </div>
     </div>
   );
 };
