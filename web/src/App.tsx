@@ -21,6 +21,7 @@ import { TournamentsPage } from './pages/tournaments/TournamentsPage';
 import { CreateTournamentPage } from './pages/tournaments/CreateTournamentPage';
 import { EditTournamentPage } from './pages/tournaments/EditTournamentPage';
 import { TournamentDetailPage } from './pages/tournaments/TournamentDetailPage';
+import { LeaderboardPage } from './pages/leaderboard/LeaderboardPage';
 
 // Protected route wrapper
 interface ProtectedRouteProps {
@@ -125,10 +126,7 @@ const App: React.FC = () => {
               path="/leaderboard"
               element={
                 <ProtectedRoute>
-                  <div className="container mx-auto px-4 py-8">
-                    <h1 className="text-3xl font-bold">Leaderboard</h1>
-                    <p className="mt-4 text-muted-foreground">Leaderboard coming soon...</p>
-                  </div>
+                  <LeaderboardPage />
                 </ProtectedRoute>
               }
             />

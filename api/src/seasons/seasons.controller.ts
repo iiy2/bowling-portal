@@ -44,10 +44,22 @@ export class SeasonsController {
     return this.seasonsService.findActive();
   }
 
+  @Get('active/leaderboard')
+  @ApiOperation({ summary: 'Get leaderboard for the currently active season' })
+  getActiveLeaderboard() {
+    return this.seasonsService.getActiveLeaderboard();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get season by ID' })
   findOne(@Param('id') id: string) {
     return this.seasonsService.findOne(id);
+  }
+
+  @Get(':id/leaderboard')
+  @ApiOperation({ summary: 'Get leaderboard for a specific season' })
+  getLeaderboard(@Param('id') id: string) {
+    return this.seasonsService.getLeaderboard(id);
   }
 
   @Patch(':id')

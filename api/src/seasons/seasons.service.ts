@@ -310,4 +310,129 @@ export class SeasonsService {
       });
     }
   }
+
+  async getActiveLeaderboard() {
+    const activeSeason = await this.findActive();
+    return this.getLeaderboard(activeSeason.id);
+  }
+
+  async getLeaderboard(seasonId: string) {
+    // Verify season exists
+    const season = await this.prisma.season.findUnique({
+      where: { id: seasonId },
+      select: {
+        id: true,
+        name: true,
+        startDate: true,
+        endDate: true,
+        isActive: true,
+      },
+    });
+
+    if (!season) {
+      throw new NotFoundException(`Season with ID ${seasonId} not found`);
+    }
+
+    // Get all participations for completed tournaments in this season
+    const participations = await this.prisma.tournamentParticipation.findMany({
+      where: {
+        tournament: {
+          seasonId,
+          status: 'COMPLETED',
+        },
+        ratingPointsEarned: {
+          not: null,
+        },
+      },
+      include: {
+        player: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            isActive: true,
+          },
+        },
+        tournament: {
+          select: {
+            id: true,
+            name: true,
+            date: true,
+          },
+        },
+      },
+      orderBy: {
+        tournament: {
+          date: 'asc',
+        },
+      },
+    });
+
+    // Aggregate rating points by player
+    const playerRatings = new Map<
+      string,
+      {
+        player: any;
+        totalPoints: number;
+        tournamentsPlayed: number;
+        tournaments: Array<{
+          tournamentId: string;
+          tournamentName: string;
+          date: string;
+          position: number | null;
+          points: number;
+        }>;
+      }
+    >();
+
+    participations.forEach((participation) => {
+      const playerId = participation.player.id;
+      const points = participation.ratingPointsEarned || 0;
+
+      if (!playerRatings.has(playerId)) {
+        playerRatings.set(playerId, {
+          player: participation.player,
+          totalPoints: 0,
+          tournamentsPlayed: 0,
+          tournaments: [],
+        });
+      }
+
+      const playerData = playerRatings.get(playerId)!;
+      playerData.totalPoints += points;
+      playerData.tournamentsPlayed += 1;
+      playerData.tournaments.push({
+        tournamentId: participation.tournament.id,
+        tournamentName: participation.tournament.name,
+        date: participation.tournament.date.toISOString(),
+        position: participation.finalPosition,
+        points,
+      });
+    });
+
+    // Convert to array and sort by total points (descending)
+    const leaderboard = Array.from(playerRatings.values())
+      .map((data, index) => ({
+        rank: index + 1, // Will be recalculated after sorting
+        playerId: data.player.id,
+        playerName: `${data.player.firstName} ${data.player.lastName}`,
+        isActive: data.player.isActive,
+        totalPoints: data.totalPoints,
+        tournamentsPlayed: data.tournamentsPlayed,
+        averagePoints: data.tournamentsPlayed > 0 ? data.totalPoints / data.tournamentsPlayed : 0,
+        tournaments: data.tournaments,
+      }))
+      .sort((a, b) => b.totalPoints - a.totalPoints)
+      .map((entry, index) => ({
+        ...entry,
+        rank: index + 1,
+      }));
+
+    return {
+      season,
+      leaderboard,
+      totalPlayers: leaderboard.length,
+      lastUpdated: new Date().toISOString(),
+    };
+  }
 }
