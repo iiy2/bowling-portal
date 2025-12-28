@@ -213,6 +213,46 @@ export const TournamentDetailPage: React.FC = () => {
                 <dd className="col-span-2 text-foreground">{tournament.description}</dd>
               </div>
             )}
+            {tournament.season?.ratingConfigurations &&
+              tournament.season.ratingConfigurations.length > 0 && (
+                <div className="grid grid-cols-3 gap-4 pt-3 border-t border-border">
+                  <dt className="text-sm font-medium text-muted-foreground">
+                    Rating Points
+                  </dt>
+                  <dd className="col-span-2">
+                    <button
+                      onClick={() => setIsRatingPointsOpen(!isRatingPointsOpen)}
+                      className="w-full flex items-center justify-between text-left hover:bg-muted/30 transition-colors rounded px-2 py-1 -ml-2"
+                    >
+                      <span className="text-sm text-foreground">
+                        Points distribution for this tournament
+                      </span>
+                      <span className="text-lg text-muted-foreground">
+                        {isRatingPointsOpen ? '−' : '+'}
+                      </span>
+                    </button>
+                    {isRatingPointsOpen && (
+                      <div className="mt-3 space-y-2">
+                        {Object.entries(
+                          tournament.season.ratingConfigurations[0].pointsDistribution,
+                        )
+                          .sort(([a], [b]) => Number(a) - Number(b))
+                          .map(([position, points]) => (
+                            <div
+                              key={position}
+                              className="flex justify-between items-center rounded-md bg-muted/50 px-3 py-2"
+                            >
+                              <span className="text-sm font-medium text-foreground">
+                                {formatOrdinal(position)} Place
+                              </span>
+                              <span className="text-sm font-bold text-primary">{points} pts</span>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </dd>
+                </div>
+              )}
           </dl>
         </div>
 
@@ -232,47 +272,6 @@ export const TournamentDetailPage: React.FC = () => {
         {isAdmin && tournament.status === TournamentStatus.UPCOMING && (
           <TournamentApplications tournamentId={id!} />
         )}
-
-        {tournament.season?.ratingConfigurations &&
-          tournament.season.ratingConfigurations.length > 0 && (
-            <div className="rounded-lg border border-border bg-card">
-              <button
-                onClick={() => setIsRatingPointsOpen(!isRatingPointsOpen)}
-                className="w-full flex items-center justify-between p-6 text-left hover:bg-muted/30 transition-colors"
-              >
-                <h2 className="text-xl font-semibold text-foreground">
-                  Rating Points Distribution
-                </h2>
-                <span className="text-2xl text-muted-foreground">
-                  {isRatingPointsOpen ? '−' : '+'}
-                </span>
-              </button>
-              {isRatingPointsOpen && (
-                <div className="px-6 pb-6 pt-0">
-                  <p className="text-sm text-muted-foreground mb-3">
-                    Points distribution for this tournament:
-                  </p>
-                  <div className="space-y-2">
-                    {Object.entries(
-                      tournament.season.ratingConfigurations[0].pointsDistribution,
-                    )
-                      .sort(([a], [b]) => Number(a) - Number(b))
-                      .map(([position, points]) => (
-                        <div
-                          key={position}
-                          className="flex justify-between items-center rounded-md bg-muted/50 px-3 py-2"
-                        >
-                          <span className="text-sm font-medium text-foreground">
-                            {formatOrdinal(position)} Place
-                          </span>
-                          <span className="text-sm font-bold text-primary">{points} pts</span>
-                        </div>
-                      ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
         {isAdmin && tournament.status === TournamentStatus.ONGOING && tournament.participations && (
           <TournamentResultsEntry
