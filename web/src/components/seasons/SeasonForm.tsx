@@ -50,8 +50,15 @@ export const SeasonForm: React.FC<SeasonFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Convert date strings to ISO-8601 DateTime format
+    const startDateTime = formData.startDate ? new Date(formData.startDate + 'T00:00:00.000Z').toISOString() : '';
+    const endDateTime = formData.endDate ? new Date(formData.endDate + 'T23:59:59.999Z').toISOString() : '';
+
     onSubmit({
       ...formData,
+      startDate: startDateTime,
+      endDate: endDateTime,
       pointsDistribution,
     });
   };

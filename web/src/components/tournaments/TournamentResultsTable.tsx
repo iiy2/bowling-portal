@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { calculateNumberOfGames } from '../../lib/utils';
 import type { TournamentParticipation } from '../../types/tournament';
 
-type SortField = 'position' | 'player' | 'handicap' | 'total' | 'rating' | `game-${number}`;
+type SortField = 'position' | 'player' | 'handicap' | 'total' | 'rating' | 'finalsTotal' | `game-${number}` | `final-${number}`;
 type SortDirection = 'asc' | 'desc';
 
 interface TournamentResultsTableProps {
@@ -12,10 +12,31 @@ interface TournamentResultsTableProps {
 export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
   participations,
 }) => {
+  // Check if tournament has finals results
+  const hasFinalsResults = participations.some(p =>
+    p.finalsScores && Array.isArray(p.finalsScores) && p.finalsScores.length > 0
+  );
+
+  // Check if tournament has rating points assigned
+  const hasRatingPoints = participations.some(p => p.ratingPointsEarned !== null && p.ratingPointsEarned !== undefined);
+
   // Determine default sort based on whether results exist
   const hasResults = participations.some(p => p.totalScore !== null);
-  const defaultSortField: SortField = hasResults ? 'total' : 'player';
-  const defaultSortDirection: SortDirection = hasResults ? 'desc' : 'asc';
+
+  // Default sort: rating points (if exists) > total score > player name
+  let defaultSortField: SortField;
+  let defaultSortDirection: SortDirection;
+
+  if (hasRatingPoints) {
+    defaultSortField = 'rating';
+    defaultSortDirection = 'desc';
+  } else if (hasResults) {
+    defaultSortField = 'total';
+    defaultSortDirection = 'desc';
+  } else {
+    defaultSortField = 'player';
+    defaultSortDirection = 'asc';
+  }
 
   const [sortField, setSortField] = useState<SortField>(defaultSortField);
   const [sortDirection, setSortDirection] = useState<SortDirection>(defaultSortDirection);
@@ -79,12 +100,26 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
           compareResult = (a.ratingPointsEarned || 0) - (b.ratingPointsEarned || 0);
           break;
 
+        case 'finalsTotal':
+          // Calculate finals totals
+          const finalsA = Array.isArray(a.finalsScores) ? a.finalsScores.reduce((sum: number, score: number) => sum + score, 0) : 0;
+          const finalsB = Array.isArray(b.finalsScores) ? b.finalsScores.reduce((sum: number, score: number) => sum + score, 0) : 0;
+          compareResult = finalsA - finalsB;
+          break;
+
         default:
           // Handle game-specific sorting
           if (sortField.startsWith('game-')) {
             const gameIndex = parseInt(sortField.split('-')[1]);
             const scoreA = (a.gameScores?.[gameIndex] ?? 0);
             const scoreB = (b.gameScores?.[gameIndex] ?? 0);
+            compareResult = scoreA - scoreB;
+          }
+          // Handle finals game-specific sorting
+          if (sortField.startsWith('final-')) {
+            const gameIndex = parseInt(sortField.split('-')[1]);
+            const scoreA = Array.isArray(a.finalsScores) ? (a.finalsScores[gameIndex] ?? 0) : 0;
+            const scoreB = Array.isArray(b.finalsScores) ? (b.finalsScores[gameIndex] ?? 0) : 0;
             compareResult = scoreA - scoreB;
           }
       }
@@ -158,6 +193,37 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
                     <SortIcon field="total" />
                   </button>
                 </th>
+                {hasFinalsResults && (
+                  <>
+                    <th>
+                      <button
+                        onClick={() => handleSort('final-0' as SortField)}
+                        className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        Final G1
+                        <SortIcon field={'final-0' as SortField} />
+                      </button>
+                    </th>
+                    <th>
+                      <button
+                        onClick={() => handleSort('final-1' as SortField)}
+                        className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        Final G2
+                        <SortIcon field={'final-1' as SortField} />
+                      </button>
+                    </th>
+                    <th>
+                      <button
+                        onClick={() => handleSort('finalsTotal')}
+                        className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        Finals Total
+                        <SortIcon field="finalsTotal" />
+                      </button>
+                    </th>
+                  </>
+                )}
                 <th className="sticky right-0 bg-card">
                   <button
                     onClick={() => handleSort('rating')}
@@ -214,6 +280,37 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
                         {participation.totalScore || '-'}
                       </span>
                     </td>
+                    {hasFinalsResults && (
+                      <>
+                        <td className="py-3 px-2 text-center">
+                          {Array.isArray(participation.finalsScores) && participation.finalsScores.length > 0 ? (
+                            <span className={participation.finalsScores[0] >= 200 ? 'font-bold text-green-700 dark:text-green-400' : 'text-foreground'}>
+                              {participation.finalsScores[0]}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          {Array.isArray(participation.finalsScores) && participation.finalsScores.length > 1 ? (
+                            <span className={participation.finalsScores[1] >= 200 ? 'font-bold text-green-700 dark:text-green-400' : 'text-foreground'}>
+                              {participation.finalsScores[1]}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="py-3 px-2 text-center">
+                          {Array.isArray(participation.finalsScores) && participation.finalsScores.length > 0 ? (
+                            <span className="text-lg font-bold text-primary">
+                              {participation.finalsScores.reduce((sum: number, score: number) => sum + score, 0)}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                      </>
+                    )}
                     <td className="py-3 px-2 text-right sticky right-0 bg-card">
                       {participation.ratingPointsEarned ? (
                         <span className="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/30 dark:text-green-400">
@@ -235,6 +332,11 @@ export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
         <p className="text-xs text-muted-foreground">
           Click column headers to sort results
         </p>
+        {hasFinalsResults && (
+          <p className="text-xs text-muted-foreground">
+            Finals results show the top 4 players' final games and their earned rating points
+          </p>
+        )}
         {participations.some(p => p.finalPosition === null && p.totalScore === null) && (
           <p className="text-xs text-muted-foreground">
             Players without results are shown with reduced opacity

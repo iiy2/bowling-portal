@@ -256,10 +256,27 @@ export class TournamentsService {
   async updateStatus(id: string, status: TournamentStatus) {
     const tournament = await this.prisma.tournament.findUnique({
       where: { id },
+      include: {
+        season: {
+          include: {
+            ratingConfigurations: true,
+          },
+        },
+        participations: {
+          include: {
+            player: true,
+          },
+        },
+      },
     });
 
     if (!tournament) {
       throw new NotFoundException(`Tournament with ID ${id} not found`);
+    }
+
+    // If setting status to COMPLETED, calculate and save rating points
+    if (status === TournamentStatus.COMPLETED) {
+      await this.calculateAndSaveRatingPoints(tournament);
     }
 
     return this.prisma.tournament.update({
@@ -274,6 +291,86 @@ export class TournamentsService {
         },
       },
     });
+  }
+
+  private async calculateAndSaveRatingPoints(tournament: any) {
+    // Get rating configuration for the season
+    const ratingConfig = tournament.season?.ratingConfigurations?.[0];
+    if (!ratingConfig || !ratingConfig.pointsDistribution) {
+      // No rating configuration, skip
+      return;
+    }
+
+    const pointsDistribution = ratingConfig.pointsDistribution as Record<string, number>;
+
+    // Get participations and determine final positions based on finals scores or qualification scores
+    const participations = tournament.participations;
+    if (!participations || participations.length === 0) {
+      return;
+    }
+
+    // Calculate number of games for handicap
+    const numberOfGames = this.calculateNumberOfGames(participations.length);
+
+    // Sort participants to determine final positions
+    const sortedParticipations = [...participations].sort((a, b) => {
+      // If tournament has finals (check if any participant has finalsScores)
+      const hasFinalsResults = participations.some(
+        (p: any) => p.finalsScores && Array.isArray(p.finalsScores) && p.finalsScores.length > 0
+      );
+
+      if (hasFinalsResults) {
+        // For tournaments with finals:
+        // Top 4 are sorted by finals total (descending)
+        // Rest are sorted by qualification total with handicap (descending)
+
+        const aHasFinalsScores = a.finalsScores && Array.isArray(a.finalsScores) && a.finalsScores.length > 0;
+        const bHasFinalsScores = b.finalsScores && Array.isArray(b.finalsScores) && b.finalsScores.length > 0;
+
+        // Both have finals scores - compare finals totals
+        if (aHasFinalsScores && bHasFinalsScores) {
+          const finalsA = a.finalsScores.reduce((sum: number, score: number) => sum + score, 0);
+          const finalsB = b.finalsScores.reduce((sum: number, score: number) => sum + score, 0);
+          return finalsB - finalsA; // Descending
+        }
+
+        // Only one has finals scores - that one is higher
+        if (aHasFinalsScores) return -1;
+        if (bHasFinalsScores) return 1;
+
+        // Neither has finals scores - sort by qualification total with handicap
+        const qualA = (a.totalScore || 0) + ((a.handicap || 0) * numberOfGames);
+        const qualB = (b.totalScore || 0) + ((b.handicap || 0) * numberOfGames);
+        return qualB - qualA; // Descending
+      } else {
+        // No finals - sort by qualification total with handicap
+        const totalA = (a.totalScore || 0) + ((a.handicap || 0) * numberOfGames);
+        const totalB = (b.totalScore || 0) + ((b.handicap || 0) * numberOfGames);
+        return totalB - totalA; // Descending
+      }
+    });
+
+    // Assign rating points based on final position
+    const updatePromises = sortedParticipations.map((participation: any, index: number) => {
+      const position = index + 1;
+      const ratingPoints = pointsDistribution[position.toString()] || 0;
+
+      return this.prisma.tournamentParticipation.update({
+        where: { id: participation.id },
+        data: {
+          finalPosition: position,
+          ratingPointsEarned: ratingPoints,
+        },
+      });
+    });
+
+    await Promise.all(updatePromises);
+  }
+
+  private calculateNumberOfGames(participantCount: number): number {
+    if (participantCount <= 8) return 6;
+    if (participantCount <= 12) return 7;
+    return 8;
   }
 
   async getUpcoming(limit: number = 5) {
