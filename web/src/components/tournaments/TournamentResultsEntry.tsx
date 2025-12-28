@@ -260,15 +260,6 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                     <SortIcon field="total" />
                   </button>
                 </th>
-                <th>
-                  <button
-                    onClick={() => handleSort('points')}
-                    className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    Pts
-                    <SortIcon field="points" />
-                  </button>
-                </th>
               </tr>
             </thead>
             <tbody>
@@ -324,17 +315,6 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                       <span className="font-semibold text-foreground text-sm">
                         {participation.totalScore || '-'}
                       </span>
-                    </td>
-                    <td className="py-3 px-2 text-center">
-                      <input
-                        type="number"
-                        min="0"
-                        defaultValue={participation.ratingPointsEarned || ''}
-                        onChange={(e) => handleChange(e, participation.id, participation, 'ratingPointsEarned')}
-                        disabled={savingCell === `${participation.id}-ratingPointsEarned`}
-                        className="w-14 rounded border-0 bg-transparent px-1 py-1 text-xs text-center text-foreground focus:bg-muted focus:outline-none disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        placeholder="0"
-                      />
                     </td>
                   </tr>
                 );
