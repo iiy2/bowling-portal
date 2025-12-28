@@ -234,7 +234,7 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                 <th>
                   <button
                     onClick={() => handleSort('handicap')}
-                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
+                    className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
                   >
                     HC
                     <SortIcon field="handicap" />
@@ -263,7 +263,7 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                 <th>
                   <button
                     onClick={() => handleSort('points')}
-                    className="group w-full text-left py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center gap-1 cursor-pointer"
+                    className="group w-full text-center py-3 px-2 text-sm font-semibold text-foreground hover:text-primary hover:bg-muted/50 transition-colors flex items-center justify-center gap-1 cursor-pointer"
                   >
                     Pts
                     <SortIcon field="points" />
@@ -302,7 +302,7 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                       const score = displayScores[gameIndex] || 0;
                       const isHighScore = score >= 200;
                       return (
-                        <td key={gameIndex} className="py-3 px-2">
+                        <td key={gameIndex} className="py-3 px-2 text-center">
                           <input
                             type="number"
                             min="0"
@@ -325,7 +325,7 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                         {participation.totalScore || '-'}
                       </span>
                     </td>
-                    <td className="py-3 px-2">
+                    <td className="py-3 px-2 text-center">
                       <input
                         type="number"
                         min="0"
