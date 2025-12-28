@@ -35,4 +35,13 @@ export class UpdateParticipationResultDto {
   @IsOptional()
   @IsNumber()
   ratingPointsEarned?: number;
+
+  @ApiProperty({
+    example: [195, 205],
+    description: 'Array of finals game scores (2 games without handicap)',
+    required: false
+  })
+  @IsOptional()
+  @IsArray()
+  finalsScores?: number[];
 }

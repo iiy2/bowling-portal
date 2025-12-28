@@ -277,6 +277,7 @@ export const TournamentDetailPage: React.FC = () => {
           <TournamentResultsEntry
             tournamentId={id!}
             participations={tournament.participations}
+            qualificationCompleted={tournament.qualificationCompleted}
             onResultsUpdated={() => refetch()}
           />
         )}

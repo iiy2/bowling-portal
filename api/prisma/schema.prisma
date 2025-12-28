@@ -86,23 +86,24 @@ model RatingConfiguration {
 
 // Tournaments
 model Tournament {
-  id              String                      @id @default(uuid())
-  seasonId        String
-  season          Season                      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+  id                     String                      @id @default(uuid())
+  seasonId               String
+  season                 Season                      @relation(fields: [seasonId], references: [id], onDelete: Cascade)
 
-  name            String
-  date            DateTime
-  location        String
-  maxParticipants Int?
-  description     String?
+  name                   String
+  date                   DateTime
+  location               String
+  maxParticipants        Int?
+  description            String?
 
-  status          TournamentStatus            @default(UPCOMING)
+  status                 TournamentStatus            @default(UPCOMING)
+  qualificationCompleted Boolean                     @default(false)
 
-  createdAt       DateTime                    @default(now())
-  updatedAt       DateTime                    @updatedAt
+  createdAt              DateTime                    @default(now())
+  updatedAt              DateTime                    @updatedAt
 
-  participations  TournamentParticipation[]
-  applications    TournamentApplication[]
+  participations         TournamentParticipation[]
+  applications           TournamentApplication[]
 
   @@map("tournaments")
 }
@@ -148,6 +149,7 @@ model TournamentParticipation {
   handicap            Float?
   gameScores          Json?      // Array of individual game scores: [180, 210, 195, ...]
   totalScore          Float?     // Sum of all game scores
+  finalsScores        Json?      // Array of finals game scores (2 games without handicap)
   finalPosition       Int?
   ratingPointsEarned  Float?
 

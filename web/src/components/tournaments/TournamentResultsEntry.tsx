@@ -7,6 +7,7 @@ import type { TournamentParticipation, TournamentParticipationUpdateData } from 
 interface TournamentResultsEntryProps {
   tournamentId: string;
   participations: TournamentParticipation[];
+  qualificationCompleted?: boolean;
   onResultsUpdated: () => void;
 }
 
@@ -16,10 +17,24 @@ type SortDirection = 'asc' | 'desc';
 export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
   tournamentId,
   participations,
+  qualificationCompleted = false,
   onResultsUpdated,
 }) => {
   const [savingCell, setSavingCell] = useState<string | null>(null);
   const saveTimeoutRef = useRef<{ [key: string]: ReturnType<typeof setTimeout> }>({});
+  const [isFinalsMode, setIsFinalsMode] = useState(qualificationCompleted);
+
+  // Initialize finals scores from participation data
+  const [finalsScores, setFinalsScores] = useState<{ [playerId: string]: number[] }>(() => {
+    const scores: { [playerId: string]: number[] } = {};
+    participations.forEach(p => {
+      const playerId = p.player?.id || p.id;
+      if (p.finalsScores && p.finalsScores.length > 0) {
+        scores[playerId] = p.finalsScores;
+      }
+    });
+    return scores;
+  });
 
   // Determine default sort based on whether results exist
   const hasResults = participations.some(p => p.totalScore !== null);
@@ -237,16 +252,99 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
     }, 500);
   };
 
+  const handleFinalsToggle = async () => {
+    const newFinalsMode = !isFinalsMode;
+    setIsFinalsMode(newFinalsMode);
+
+    try {
+      await api.patch(`/tournaments/${tournamentId}`, {
+        qualificationCompleted: newFinalsMode
+      });
+      onResultsUpdated();
+    } catch (error) {
+      toast.error('Failed to save qualification status');
+      setIsFinalsMode(!newFinalsMode); // Revert on error
+    }
+  };
+
+  const saveFinalsScore = async (participationId: string, scores: number[]) => {
+    try {
+      await api.patch(
+        `/tournaments/${tournamentId}/participants/${participationId}`,
+        { finalsScores: scores }
+      );
+      onResultsUpdated();
+    } catch (error) {
+      toast.error('Failed to save finals score');
+    }
+  };
+
+  const handleFinalsScoreChange = (playerId: string, participationId: string, gameIndex: number, value: string) => {
+    const numValue = parseInt(value) || 0;
+    const validatedValue = Math.max(0, Math.min(300, numValue));
+
+    setFinalsScores(prev => {
+      const playerScores = prev[playerId] || [0, 0];
+      const newScores = [...playerScores];
+      newScores[gameIndex] = validatedValue;
+
+      // Save to database with debouncing
+      const cellKey = `${participationId}-finals-${gameIndex}`;
+      if (saveTimeoutRef.current[cellKey]) {
+        clearTimeout(saveTimeoutRef.current[cellKey]);
+      }
+
+      saveTimeoutRef.current[cellKey] = setTimeout(() => {
+        saveFinalsScore(participationId, newScores);
+        delete saveTimeoutRef.current[cellKey];
+      }, 500);
+
+      return { ...prev, [playerId]: newScores };
+    });
+  };
+
+  // Get top 4 finalists based on Total+HC score, then sort by finals total
+  const finalists = useMemo(() => {
+    const top4 = [...participations]
+      .map(p => ({
+        ...p,
+        totalWithHandicap: (p.totalScore || 0) + ((p.handicap || 0) * numberOfGames)
+      }))
+      .sort((a, b) => b.totalWithHandicap - a.totalWithHandicap)
+      .slice(0, 4);
+
+    // Sort by finals total (descending)
+    return top4.sort((a, b) => {
+      const playerId_a = a.player?.id || a.id;
+      const playerId_b = b.player?.id || b.id;
+      const finalsTotal_a = (finalsScores[playerId_a] || [0, 0]).reduce((sum, score) => sum + score, 0);
+      const finalsTotal_b = (finalsScores[playerId_b] || [0, 0]).reduce((sum, score) => sum + score, 0);
+      return finalsTotal_b - finalsTotal_a;
+    });
+  }, [participations, numberOfGames, finalsScores]);
+
   return (
     <div className="rounded-lg border border-border bg-card p-6">
-      <div className="mb-4">
-        <h2 className="text-xl font-semibold text-foreground">Enter Results</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Number of games: {numberOfGames} ({participations.length} players: {participations.length <= 8 ? '≤8 = 6 games' : participations.length <= 12 ? '9-12 = 7 games' : '13+ = 8 games'})
-        </p>
-        <p className="text-xs text-muted-foreground mt-1">
-          Click any cell to edit. Changes save automatically. Click column headers to sort.
-        </p>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-semibold text-foreground">Enter Results</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Number of games: {numberOfGames} ({participations.length} players: {participations.length <= 8 ? '≤8 = 6 games' : participations.length <= 12 ? '9-12 = 7 games' : '13+ = 8 games'})
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            {isFinalsMode ? 'Qualification results are now readonly' : 'Click any cell to edit. Changes save automatically. Click column headers to sort.'}
+          </p>
+        </div>
+        <button
+          onClick={handleFinalsToggle}
+          className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${
+            isFinalsMode
+              ? 'bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50'
+              : 'bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50'
+          }`}
+        >
+          {isFinalsMode ? 'Back to Qualification' : 'Complete Qualification'}
+        </button>
       </div>
 
       {participations.length === 0 ? (
@@ -364,12 +462,13 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
                             max="300"
                             defaultValue={displayScores[gameIndex] || ''}
                             onChange={(e) => handleChange(e, participation.id, participation, `game-${gameIndex}`)}
-                            disabled={savingCell === `${participation.id}-game-${gameIndex}`}
+                            disabled={savingCell === `${participation.id}-game-${gameIndex}` || isFinalsMode}
+                            readOnly={isFinalsMode}
                             className={`w-14 rounded border-0 px-1 py-1 text-xs text-center focus:outline-none disabled:opacity-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                               isHighScore
                                 ? 'bg-green-100 dark:bg-green-900/30 text-green-900 dark:text-green-100 font-bold focus:bg-green-200 dark:focus:bg-green-900/50'
                                 : 'bg-transparent text-foreground focus:bg-muted'
-                            }`}
+                            } ${isFinalsMode ? 'cursor-not-allowed' : ''}`}
                             placeholder="0"
                           />
                         </td>
@@ -435,6 +534,95 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {isFinalsMode && (
+        <div className="mt-6 pt-6 border-t border-border">
+          <h3 className="text-lg font-semibold text-foreground mb-4">Finals - Top 4 Players</h3>
+          <p className="text-xs text-muted-foreground mb-4">
+            Enter 2 final games without handicap for each player
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="text-left py-3 px-2 text-sm font-semibold text-foreground">
+                    Position
+                  </th>
+                  <th className="text-left py-3 px-2 text-sm font-semibold text-foreground">
+                    Player
+                  </th>
+                  <th className="text-center py-3 px-2 text-sm font-semibold text-foreground">
+                    Qual. Score
+                  </th>
+                  <th className="text-center py-3 px-2 text-sm font-semibold text-foreground">
+                    Final G1
+                  </th>
+                  <th className="text-center py-3 px-2 text-sm font-semibold text-foreground">
+                    Final G2
+                  </th>
+                  <th className="text-center py-3 px-2 text-sm font-semibold text-foreground">
+                    Finals Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {finalists.map((finalist, index) => {
+                  const playerId = finalist.player?.id || finalist.id;
+                  const playerFinalsScores = finalsScores[playerId] || [0, 0];
+                  const finalsTotal = playerFinalsScores.reduce((sum, score) => sum + score, 0);
+
+                  return (
+                    <tr key={finalist.id} className="border-b border-border">
+                      <td className="py-3 px-2">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 font-bold">
+                          {index + 1}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2">
+                        <span className="font-medium text-foreground">
+                          {finalist.player?.firstName} {finalist.player?.lastName}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <span className="font-semibold text-foreground">
+                          {finalist.totalWithHandicap}
+                        </span>
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          max="300"
+                          value={playerFinalsScores[0] || ''}
+                          onChange={(e) => handleFinalsScoreChange(playerId, finalist.id, 0, e.target.value)}
+                          className="w-14 rounded border-0 px-1 py-1 text-xs text-center focus:outline-none bg-transparent text-foreground focus:bg-muted [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          placeholder="0"
+                        />
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <input
+                          type="number"
+                          min="0"
+                          max="300"
+                          value={playerFinalsScores[1] || ''}
+                          onChange={(e) => handleFinalsScoreChange(playerId, finalist.id, 1, e.target.value)}
+                          className="w-14 rounded border-0 px-1 py-1 text-xs text-center focus:outline-none bg-transparent text-foreground focus:bg-muted [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          placeholder="0"
+                        />
+                      </td>
+                      <td className="py-3 px-2 text-center">
+                        <span className="text-lg font-bold text-primary">
+                          {finalsTotal || '-'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

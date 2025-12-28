@@ -18,6 +18,7 @@ export interface Tournament {
   status: TournamentStatus;
   maxParticipants?: number;
   description?: string;
+  qualificationCompleted?: boolean;
   createdAt: string;
   updatedAt: string;
   season?: Season;
@@ -36,6 +37,7 @@ export interface TournamentParticipation {
   handicap?: number;
   gameScores?: number[];
   totalScore?: number;
+  finalsScores?: number[];
   ratingPointsEarned?: number;
   createdAt: string;
   updatedAt: string;
@@ -61,6 +63,7 @@ export interface UpdateTournamentData {
   status?: TournamentStatus;
   maxParticipants?: number;
   description?: string;
+  qualificationCompleted?: boolean;
 }
 
 export interface TournamentQueryParams {
@@ -117,4 +120,5 @@ export interface TournamentParticipationUpdateData {
   handicap?: number;
   ratingPointsEarned?: number;
   gameScores?: number[];
+  finalsScores?: number[];
 }

@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsInt,
   Min,
+  IsBoolean,
 } from 'class-validator';
 
 export enum TournamentStatus {
@@ -75,4 +76,13 @@ export class CreateTournamentDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @ApiPropertyOptional({
+    example: false,
+    description: 'Whether qualification round is completed',
+    default: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  qualificationCompleted?: boolean;
 }
