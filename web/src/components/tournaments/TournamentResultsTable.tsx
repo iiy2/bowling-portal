@@ -12,8 +12,13 @@ interface TournamentResultsTableProps {
 export const TournamentResultsTable: React.FC<TournamentResultsTableProps> = ({
   participations,
 }) => {
-  const [sortField, setSortField] = useState<SortField>('position');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  // Determine default sort based on whether results exist
+  const hasResults = participations.some(p => p.totalScore !== null);
+  const defaultSortField: SortField = hasResults ? 'total' : 'player';
+  const defaultSortDirection: SortDirection = hasResults ? 'desc' : 'asc';
+
+  const [sortField, setSortField] = useState<SortField>(defaultSortField);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(defaultSortDirection);
 
   // Calculate number of games based on number of players
   const numberOfGames = useMemo(() =>

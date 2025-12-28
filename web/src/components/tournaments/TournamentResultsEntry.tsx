@@ -20,8 +20,14 @@ export const TournamentResultsEntry: React.FC<TournamentResultsEntryProps> = ({
 }) => {
   const [savingCell, setSavingCell] = useState<string | null>(null);
   const saveTimeoutRef = useRef<{ [key: string]: ReturnType<typeof setTimeout> }>({});
-  const [sortField, setSortField] = useState<SortField>('player');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  // Determine default sort based on whether results exist
+  const hasResults = participations.some(p => p.totalScore !== null);
+  const defaultSortField: SortField = hasResults ? 'total' : 'player';
+  const defaultSortDirection: SortDirection = hasResults ? 'desc' : 'asc';
+
+  const [sortField, setSortField] = useState<SortField>(defaultSortField);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(defaultSortDirection);
 
   // Calculate number of games based on number of players
   const numberOfGames = useMemo(() =>
