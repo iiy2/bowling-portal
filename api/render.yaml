@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: bowling-league-api
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm install && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && npm run start:prod
+    rootDir: api
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # Other environment variables should be added via the Render dashboard for security:
+      # - DATABASE_URL
+      # - DIRECT_DATABASE_URL
+      # - JWT_SECRET
+      # - JWT_EXPIRATION
+      # - JWT_REFRESH_SECRET
+      # - JWT_REFRESH_EXPIRATION
+      # - REDIS_HOST
+      # - REDIS_PORT
+      # - REDIS_PASSWORD
+      # - REDIS_TLS
+      # - FRONTEND_URL

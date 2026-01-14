@@ -170,6 +170,52 @@ FRONTEND_URL="http://localhost:5173"
 VITE_API_URL=http://localhost:3000
 ```
 
+## Production Deployment
+
+This application is designed for easy deployment to free-tier cloud services. For detailed deployment instructions, see the [Deployment Plan](/.claude/plans/curious-stirring-journal.md).
+
+### Quick Start: 100% Free Deployment
+
+**Architecture:**
+- Frontend: Vercel (free tier)
+- Backend: Render (free tier)
+- Database: Supabase PostgreSQL (free tier)
+- Cache: Upstash Redis (free tier)
+
+**Deployment Steps:**
+
+1. **Set up databases:**
+   - Create account at [Supabase](https://supabase.com) for PostgreSQL
+   - Create account at [Upstash](https://upstash.com) for Redis
+   - Copy connection strings
+
+2. **Generate secrets:**
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+
+3. **Deploy backend to Render:**
+   - Sign up at [Render](https://render.com)
+   - Connect GitHub repository
+   - Set root directory to `api`
+   - Add environment variables (see `api/.env.example`)
+   - Deploy
+
+4. **Deploy frontend to Vercel:**
+   - Sign up at [Vercel](https://vercel.com)
+   - Connect GitHub repository
+   - Set root directory to `web`
+   - Add `VITE_API_URL` environment variable
+   - Deploy
+
+5. **Update CORS:**
+   - In Render dashboard, update `FRONTEND_URL` to your Vercel URL
+   - Redeploy backend
+
+**Note:** Render free tier sleeps after 15 minutes of inactivity (15-30s wake time). Use [UptimeRobot](https://uptimerobot.com) to keep it warm during active hours.
+
+For complete instructions, troubleshooting, and alternative deployment options, see the full [Deployment Plan](/.claude/plans/curious-stirring-journal.md).
+
 ## API Documentation
 
 Once the backend is running, visit `http://localhost:3000/api/docs` for interactive API documentation powered by Swagger.
