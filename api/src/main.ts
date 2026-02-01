@@ -24,7 +24,9 @@ async function bootstrap() {
   // Swagger API Documentation
   const config = new DocumentBuilder()
     .setTitle('Bowling League Organizer API')
-    .setDescription('API for managing bowling tournaments, players, and ratings')
+    .setDescription(
+      'API for managing bowling tournaments, players, and ratings',
+    )
     .setVersion('1.0')
     .addBearerAuth()
     .addTag('auth', 'Authentication endpoints')

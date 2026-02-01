@@ -10,9 +10,17 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { TournamentsService } from './tournaments.service';
-import { CreateTournamentDto, TournamentStatus } from './dto/create-tournament.dto';
+import {
+  CreateTournamentDto,
+  TournamentStatus,
+} from './dto/create-tournament.dto';
 import { UpdateTournamentDto } from './dto/update-tournament.dto';
 import { TournamentQueryDto } from './dto/tournament-query.dto';
 import { UpdateParticipationResultDto } from './dto/update-participation-result.dto';
@@ -40,7 +48,9 @@ export class TournamentsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all tournaments with filtering and pagination' })
+  @ApiOperation({
+    summary: 'Get all tournaments with filtering and pagination',
+  })
   @ApiResponse({ status: 200, description: 'List of tournaments' })
   findAll(@Query() query: TournamentQueryDto) {
     return this.tournamentsService.findAll(query);
@@ -71,7 +81,10 @@ export class TournamentsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
   @ApiResponse({ status: 404, description: 'Tournament not found' })
-  update(@Param('id') id: string, @Body() updateTournamentDto: UpdateTournamentDto) {
+  update(
+    @Param('id') id: string,
+    @Body() updateTournamentDto: UpdateTournamentDto,
+  ) {
     return this.tournamentsService.update(id, updateTournamentDto);
   }
 
@@ -100,7 +113,10 @@ export class TournamentsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
   @ApiResponse({ status: 404, description: 'Tournament not found' })
-  @ApiResponse({ status: 409, description: 'Conflict - Tournament has participants' })
+  @ApiResponse({
+    status: 409,
+    description: 'Conflict - Tournament has participants',
+  })
   remove(@Param('id') id: string) {
     return this.tournamentsService.remove(id);
   }
@@ -110,20 +126,37 @@ export class TournamentsController {
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Apply to tournament (authenticated users)' })
-  @ApiResponse({ status: 201, description: 'Application submitted successfully' })
-  @ApiResponse({ status: 400, description: 'Bad request - validation error or tournament full' })
+  @ApiResponse({
+    status: 201,
+    description: 'Application submitted successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - validation error or tournament full',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 404, description: 'Tournament not found' })
   @ApiResponse({ status: 409, description: 'Conflict - already applied' })
-  applyToTournament(@Param('id') id: string, @Request() req: any, @Body('playerId') playerId: string) {
-    return this.tournamentsService.applyToTournament(id, playerId, req.user.id, req.user.role);
+  applyToTournament(
+    @Param('id') id: string,
+    @Request() req: any,
+    @Body('playerId') playerId: string,
+  ) {
+    return this.tournamentsService.applyToTournament(
+      id,
+      playerId,
+      req.user.id,
+      req.user.role,
+    );
   }
 
   @Get(':id/applications')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all applications for a tournament (Admin only)' })
+  @ApiOperation({
+    summary: 'Get all applications for a tournament (Admin only)',
+  })
   @ApiResponse({ status: 200, description: 'List of applications' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
@@ -137,7 +170,10 @@ export class TournamentsController {
   @Roles('ADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Approve tournament application (Admin only)' })
-  @ApiResponse({ status: 200, description: 'Application approved and participant created' })
+  @ApiResponse({
+    status: 200,
+    description: 'Application approved and participant created',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
   @ApiResponse({ status: 404, description: 'Application not found' })
@@ -171,17 +207,27 @@ export class TournamentsController {
   @Roles('ADMIN')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update participant results (Admin only)' })
-  @ApiResponse({ status: 200, description: 'Participation results updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Participation results updated successfully',
+  })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
-  @ApiResponse({ status: 404, description: 'Tournament or participation not found' })
+  @ApiResponse({
+    status: 404,
+    description: 'Tournament or participation not found',
+  })
   updateParticipationResult(
     @Param('id') tournamentId: string,
     @Param('participationId') participationId: string,
     @Body() updateData: UpdateParticipationResultDto,
   ) {
-    return this.tournamentsService.updateParticipationResult(tournamentId, participationId, updateData);
+    return this.tournamentsService.updateParticipationResult(
+      tournamentId,
+      participationId,
+      updateData,
+    );
   }
 
   @Delete(':id/participations/:participationId')
@@ -192,11 +238,17 @@ export class TournamentsController {
   @ApiResponse({ status: 200, description: 'Participant removed successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
-  @ApiResponse({ status: 404, description: 'Tournament or participation not found' })
+  @ApiResponse({
+    status: 404,
+    description: 'Tournament or participation not found',
+  })
   removeParticipant(
     @Param('id') tournamentId: string,
     @Param('participationId') participationId: string,
   ) {
-    return this.tournamentsService.removeParticipant(tournamentId, participationId);
+    return this.tournamentsService.removeParticipant(
+      tournamentId,
+      participationId,
+    );
   }
 }

@@ -4,14 +4,50 @@ import {
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { FirestoreService } from '../firestore/firestore.service';
+import { CascadeService } from '../firestore/cascade.service';
 import { CreateSeasonDto } from './dto/create-season.dto';
 import { UpdateSeasonDto } from './dto/update-season.dto';
 import { UpdateRatingConfigDto } from './dto/update-rating-config.dto';
 
+interface Season {
+  id: string;
+  name: string;
+  startDate: FirebaseFirestore.Timestamp;
+  endDate: FirebaseFirestore.Timestamp;
+  isActive: boolean;
+  createdAt: FirebaseFirestore.Timestamp;
+  updatedAt: FirebaseFirestore.Timestamp;
+  ratingConfig?: {
+    pointsDistribution: Record<string, number>;
+    createdAt: FirebaseFirestore.Timestamp;
+    updatedAt: FirebaseFirestore.Timestamp;
+  } | null;
+  tournamentCount: number;
+}
+
+interface TournamentParticipation {
+  id: string;
+  tournamentId: string;
+  playerId: string;
+  playerFirstName: string;
+  playerLastName: string;
+  tournamentName: string;
+  tournamentDate: FirebaseFirestore.Timestamp;
+  seasonId: string;
+  gameScores: number[] | null;
+  totalScore: number | null;
+  finalsScores: number[] | null;
+  finalPosition: number | null;
+  ratingPointsEarned: number | null;
+}
+
 @Injectable()
 export class SeasonsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private firestore: FirestoreService,
+    private cascadeService: CascadeService,
+  ) {}
 
   async create(createSeasonDto: CreateSeasonDto) {
     const { pointsDistribution, ...seasonData } = createSeasonDto;
@@ -34,154 +70,206 @@ export class SeasonsService {
     }
 
     // Check for overlapping seasons
-    const overlapping = await this.prisma.season.findFirst({
-      where: {
-        OR: [
-          {
-            AND: [
-              { startDate: { lte: startDate } },
-              { endDate: { gte: startDate } },
-            ],
-          },
-          {
-            AND: [
-              { startDate: { lte: endDate } },
-              { endDate: { gte: endDate } },
-            ],
-          },
-          {
-            AND: [
-              { startDate: { gte: startDate } },
-              { endDate: { lte: endDate } },
-            ],
-          },
-        ],
-      },
-    });
+    const seasonsSnapshot = await this.firestore.collection('seasons').get();
+    const existingSeasons = seasonsSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Season[];
 
-    if (overlapping) {
-      throw new ConflictException(
-        `Season dates overlap with existing season "${overlapping.name}"`,
-      );
+    for (const existingSeason of existingSeasons) {
+      const existingStart = this.firestore.fromTimestamp(existingSeason.startDate)!;
+      const existingEnd = this.firestore.fromTimestamp(existingSeason.endDate)!;
+
+      const overlaps =
+        (startDate <= existingEnd && startDate >= existingStart) ||
+        (endDate <= existingEnd && endDate >= existingStart) ||
+        (startDate <= existingStart && endDate >= existingEnd);
+
+      if (overlaps) {
+        throw new ConflictException(
+          `Season dates overlap with existing season "${existingSeason.name}"`,
+        );
+      }
     }
 
     // If setting this season as active, deactivate others
     if (createSeasonDto.isActive) {
-      await this.prisma.season.updateMany({
-        where: { isActive: true },
-        data: { isActive: false },
+      const batch = this.firestore.batch();
+      const activeSeasons = await this.firestore
+        .collection('seasons')
+        .where('isActive', '==', true)
+        .get();
+
+      activeSeasons.docs.forEach((doc) => {
+        batch.update(doc.ref, { isActive: false });
       });
+      await batch.commit();
     }
 
-    const season = await this.prisma.season.create({
-      data: {
-        ...seasonData,
-        startDate,
-        endDate,
-      },
-      include: {
-        ratingConfigurations: true,
-      },
-    });
+    const seasonId = this.firestore.generateId();
+    const seasonDoc = {
+      id: seasonId,
+      name: seasonData.name,
+      startDate: this.firestore.toTimestamp(startDate),
+      endDate: this.firestore.toTimestamp(endDate),
+      isActive: seasonData.isActive ?? false,
+      createdAt: this.firestore.serverTimestamp(),
+      updatedAt: this.firestore.serverTimestamp(),
+      ratingConfig: pointsDistribution
+        ? {
+            pointsDistribution,
+            createdAt: this.firestore.serverTimestamp(),
+            updatedAt: this.firestore.serverTimestamp(),
+          }
+        : null,
+      tournamentCount: 0,
+    };
 
-    // Create rating configuration if provided
-    if (pointsDistribution) {
-      await this.prisma.ratingConfiguration.create({
-        data: {
-          seasonId: season.id,
-          pointsDistribution,
-        },
-      });
-    }
+    await this.firestore.doc('seasons', seasonId).set(seasonDoc);
 
-    return this.findOne(season.id);
+    return this.findOne(seasonId);
   }
 
   async findAll() {
-    return this.prisma.season.findMany({
-      orderBy: { startDate: 'desc' },
-      include: {
-        ratingConfigurations: true,
+    const snapshot = await this.firestore
+      .collection('seasons')
+      .orderBy('startDate', 'desc')
+      .get();
+
+    return snapshot.docs.map((doc) => {
+      const data = doc.data() as Season;
+      return {
+        id: doc.id,
+        name: data.name,
+        startDate: this.firestore.fromTimestamp(data.startDate),
+        endDate: this.firestore.fromTimestamp(data.endDate),
+        isActive: data.isActive,
+        createdAt: this.firestore.fromTimestamp(data.createdAt),
+        updatedAt: this.firestore.fromTimestamp(data.updatedAt),
+        ratingConfigurations: data.ratingConfig
+          ? [
+              {
+                pointsDistribution: data.ratingConfig.pointsDistribution,
+                createdAt: this.firestore.fromTimestamp(data.ratingConfig.createdAt),
+                updatedAt: this.firestore.fromTimestamp(data.ratingConfig.updatedAt),
+              },
+            ]
+          : [],
         _count: {
-          select: {
-            tournaments: true,
-          },
+          tournaments: data.tournamentCount || 0,
         },
-      },
+      };
     });
   }
 
   async findActive() {
-    const season = await this.prisma.season.findFirst({
-      where: { isActive: true },
-      include: {
-        ratingConfigurations: true,
-        _count: {
-          select: {
-            tournaments: true,
-          },
-        },
-      },
-    });
+    const snapshot = await this.firestore
+      .collection('seasons')
+      .where('isActive', '==', true)
+      .limit(1)
+      .get();
 
-    if (!season) {
+    if (snapshot.empty) {
       throw new NotFoundException('No active season found');
     }
 
-    return season;
+    const doc = snapshot.docs[0];
+    const data = doc.data() as Season;
+
+    return {
+      id: doc.id,
+      name: data.name,
+      startDate: this.firestore.fromTimestamp(data.startDate),
+      endDate: this.firestore.fromTimestamp(data.endDate),
+      isActive: data.isActive,
+      createdAt: this.firestore.fromTimestamp(data.createdAt),
+      updatedAt: this.firestore.fromTimestamp(data.updatedAt),
+      ratingConfigurations: data.ratingConfig
+        ? [
+            {
+              pointsDistribution: data.ratingConfig.pointsDistribution,
+              createdAt: this.firestore.fromTimestamp(data.ratingConfig.createdAt),
+              updatedAt: this.firestore.fromTimestamp(data.ratingConfig.updatedAt),
+            },
+          ]
+        : [],
+      _count: {
+        tournaments: data.tournamentCount || 0,
+      },
+    };
   }
 
   async findOne(id: string) {
-    const season = await this.prisma.season.findUnique({
-      where: { id },
-      include: {
-        ratingConfigurations: true,
-        tournaments: {
-          take: 10,
-          orderBy: { date: 'desc' },
-          select: {
-            id: true,
-            name: true,
-            date: true,
-            status: true,
-            _count: {
-              select: {
-                participations: true,
-              },
-            },
-          },
-        },
-        _count: {
-          select: {
-            tournaments: true,
-          },
-        },
-      },
-    });
+    const seasonDoc = await this.firestore.doc('seasons', id).get();
 
-    if (!season) {
+    if (!seasonDoc.exists) {
       throw new NotFoundException(`Season with ID ${id} not found`);
     }
 
-    return season;
+    const data = seasonDoc.data() as Season;
+
+    // Get recent tournaments for this season
+    const tournamentsSnapshot = await this.firestore
+      .collection('tournaments')
+      .where('seasonId', '==', id)
+      .orderBy('date', 'desc')
+      .limit(10)
+      .get();
+
+    const tournaments = tournamentsSnapshot.docs.map((doc) => {
+      const tData = doc.data();
+      return {
+        id: doc.id,
+        name: tData.name,
+        date: this.firestore.fromTimestamp(tData.date),
+        status: tData.status,
+        _count: {
+          participations: tData.participationCount || 0,
+        },
+      };
+    });
+
+    return {
+      id: seasonDoc.id,
+      name: data.name,
+      startDate: this.firestore.fromTimestamp(data.startDate),
+      endDate: this.firestore.fromTimestamp(data.endDate),
+      isActive: data.isActive,
+      createdAt: this.firestore.fromTimestamp(data.createdAt),
+      updatedAt: this.firestore.fromTimestamp(data.updatedAt),
+      ratingConfigurations: data.ratingConfig
+        ? [
+            {
+              seasonId: id,
+              pointsDistribution: data.ratingConfig.pointsDistribution,
+              createdAt: this.firestore.fromTimestamp(data.ratingConfig.createdAt),
+              updatedAt: this.firestore.fromTimestamp(data.ratingConfig.updatedAt),
+            },
+          ]
+        : [],
+      tournaments,
+      _count: {
+        tournaments: data.tournamentCount || 0,
+      },
+    };
   }
 
   async update(id: string, updateSeasonDto: UpdateSeasonDto) {
-    const season = await this.prisma.season.findUnique({
-      where: { id },
-    });
+    const seasonDoc = await this.firestore.doc('seasons', id).get();
 
-    if (!season) {
+    if (!seasonDoc.exists) {
       throw new NotFoundException(`Season with ID ${id} not found`);
     }
+
+    const season = seasonDoc.data() as Season;
 
     // Validate dates if provided
     const startDate = updateSeasonDto.startDate
       ? new Date(updateSeasonDto.startDate)
-      : new Date(season.startDate);
+      : this.firestore.fromTimestamp(season.startDate)!;
     const endDate = updateSeasonDto.endDate
       ? new Date(updateSeasonDto.endDate)
-      : new Date(season.endDate);
+      : this.firestore.fromTimestamp(season.endDate)!;
 
     if (startDate >= endDate) {
       throw new BadRequestException('Start date must be before end date');
@@ -189,126 +277,132 @@ export class SeasonsService {
 
     // If setting this season as active, deactivate others
     if (updateSeasonDto.isActive) {
-      await this.prisma.season.updateMany({
-        where: { isActive: true, NOT: { id } },
-        data: { isActive: false },
+      const batch = this.firestore.batch();
+      const activeSeasons = await this.firestore
+        .collection('seasons')
+        .where('isActive', '==', true)
+        .get();
+
+      activeSeasons.docs.forEach((doc) => {
+        if (doc.id !== id) {
+          batch.update(doc.ref, { isActive: false });
+        }
       });
+      await batch.commit();
     }
 
     const { pointsDistribution, ...seasonData } = updateSeasonDto;
 
-    const updated = await this.prisma.season.update({
-      where: { id },
-      data: seasonData,
-      include: {
-        ratingConfigurations: true,
-      },
-    });
+    const updateData: any = {
+      ...seasonData,
+      updatedAt: this.firestore.serverTimestamp(),
+    };
+
+    if (updateSeasonDto.startDate) {
+      updateData.startDate = this.firestore.toTimestamp(startDate);
+    }
+    if (updateSeasonDto.endDate) {
+      updateData.endDate = this.firestore.toTimestamp(endDate);
+    }
 
     // Update rating configuration if provided
     if (pointsDistribution) {
-      const existingConfig = await this.prisma.ratingConfiguration.findUnique({
-        where: { seasonId: id },
-      });
+      updateData.ratingConfig = {
+        pointsDistribution,
+        createdAt: season.ratingConfig?.createdAt || this.firestore.serverTimestamp(),
+        updatedAt: this.firestore.serverTimestamp(),
+      };
+    }
 
-      if (existingConfig) {
-        await this.prisma.ratingConfiguration.update({
-          where: { seasonId: id },
-          data: { pointsDistribution },
-        });
-      } else {
-        await this.prisma.ratingConfiguration.create({
-          data: {
-            seasonId: id,
-            pointsDistribution,
-          },
-        });
-      }
+    await this.firestore.doc('seasons', id).update(updateData);
+
+    // Update denormalized season name in tournaments if name changed
+    if (updateSeasonDto.name && updateSeasonDto.name !== season.name) {
+      await this.cascadeService.updateSeasonNameDenormalized(
+        id,
+        updateSeasonDto.name,
+      );
     }
 
     return this.findOne(id);
   }
 
   async remove(id: string) {
-    const season = await this.prisma.season.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: {
-            tournaments: true,
-          },
-        },
-      },
-    });
+    const seasonDoc = await this.firestore.doc('seasons', id).get();
 
-    if (!season) {
+    if (!seasonDoc.exists) {
       throw new NotFoundException(`Season with ID ${id} not found`);
     }
 
-    if (season._count.tournaments > 0) {
+    const season = seasonDoc.data() as Season;
+
+    if (season.tournamentCount > 0) {
       throw new BadRequestException(
-        `Cannot delete season with ${season._count.tournaments} tournaments. Delete tournaments first.`,
+        `Cannot delete season with ${season.tournamentCount} tournaments. Delete tournaments first.`,
       );
     }
 
-    await this.prisma.season.delete({
-      where: { id },
-    });
+    await this.firestore.doc('seasons', id).delete();
 
     return { message: 'Season deleted successfully' };
   }
 
   async getRatingConfig(seasonId: string) {
-    const config = await this.prisma.ratingConfiguration.findUnique({
-      where: { seasonId },
-      include: {
-        season: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
+    const seasonDoc = await this.firestore.doc('seasons', seasonId).get();
 
-    if (!config) {
+    if (!seasonDoc.exists) {
+      throw new NotFoundException(`Season with ID ${seasonId} not found`);
+    }
+
+    const season = seasonDoc.data() as Season;
+
+    if (!season.ratingConfig) {
       throw new NotFoundException(
         `Rating configuration for season ${seasonId} not found`,
       );
     }
 
-    return config;
+    return {
+      seasonId,
+      pointsDistribution: season.ratingConfig.pointsDistribution,
+      createdAt: this.firestore.fromTimestamp(season.ratingConfig.createdAt),
+      updatedAt: this.firestore.fromTimestamp(season.ratingConfig.updatedAt),
+      season: {
+        id: seasonId,
+        name: season.name,
+      },
+    };
   }
 
   async updateRatingConfig(
     seasonId: string,
     updateRatingConfigDto: UpdateRatingConfigDto,
   ) {
-    const season = await this.prisma.season.findUnique({
-      where: { id: seasonId },
-    });
+    const seasonDoc = await this.firestore.doc('seasons', seasonId).get();
 
-    if (!season) {
+    if (!seasonDoc.exists) {
       throw new NotFoundException(`Season with ID ${seasonId} not found`);
     }
 
-    const existingConfig = await this.prisma.ratingConfiguration.findUnique({
-      where: { seasonId },
+    const season = seasonDoc.data() as Season;
+
+    const ratingConfig = {
+      pointsDistribution: updateRatingConfigDto.pointsDistribution,
+      createdAt: season.ratingConfig?.createdAt || this.firestore.serverTimestamp(),
+      updatedAt: this.firestore.serverTimestamp(),
+    };
+
+    await this.firestore.doc('seasons', seasonId).update({
+      ratingConfig,
+      updatedAt: this.firestore.serverTimestamp(),
     });
 
-    if (existingConfig) {
-      return this.prisma.ratingConfiguration.update({
-        where: { seasonId },
-        data: updateRatingConfigDto,
-      });
-    } else {
-      return this.prisma.ratingConfiguration.create({
-        data: {
-          seasonId,
-          ...updateRatingConfigDto,
-        },
-      });
-    }
+    return {
+      seasonId,
+      ...updateRatingConfigDto,
+      createdAt: this.firestore.fromTimestamp(ratingConfig.createdAt as any),
+      updatedAt: new Date(),
+    };
   }
 
   async getActiveLeaderboard() {
@@ -318,61 +412,79 @@ export class SeasonsService {
 
   async getLeaderboard(seasonId: string) {
     // Verify season exists
-    const season = await this.prisma.season.findUnique({
-      where: { id: seasonId },
-      select: {
-        id: true,
-        name: true,
-        startDate: true,
-        endDate: true,
-        isActive: true,
-      },
-    });
+    const seasonDoc = await this.firestore.doc('seasons', seasonId).get();
 
-    if (!season) {
+    if (!seasonDoc.exists) {
       throw new NotFoundException(`Season with ID ${seasonId} not found`);
     }
 
-    // Get all participations for completed tournaments in this season
-    const participations = await this.prisma.tournamentParticipation.findMany({
-      where: {
-        tournament: {
-          seasonId,
-          status: 'COMPLETED',
-        },
-        ratingPointsEarned: {
-          not: null,
-        },
-      },
-      include: {
-        player: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            isActive: true,
-          },
-        },
-        tournament: {
-          select: {
-            id: true,
-            name: true,
-            date: true,
-          },
-        },
-      },
-      orderBy: {
-        tournament: {
-          date: 'asc',
-        },
-      },
-    });
+    const seasonData = seasonDoc.data() as Season;
+    const season = {
+      id: seasonId,
+      name: seasonData.name,
+      startDate: this.firestore.fromTimestamp(seasonData.startDate),
+      endDate: this.firestore.fromTimestamp(seasonData.endDate),
+      isActive: seasonData.isActive,
+    };
+
+    // Get all completed tournaments for this season
+    const completedTournamentsSnapshot = await this.firestore
+      .collection('tournaments')
+      .where('seasonId', '==', seasonId)
+      .where('status', '==', 'COMPLETED')
+      .get();
+
+    const completedTournamentIds = completedTournamentsSnapshot.docs.map(
+      (doc) => doc.id,
+    );
+
+    if (completedTournamentIds.length === 0) {
+      return {
+        season,
+        leaderboard: [],
+        totalPlayers: 0,
+        lastUpdated: new Date().toISOString(),
+      };
+    }
+
+    // Get all participations for completed tournaments with rating points
+    const participationsSnapshot = await this.firestore
+      .collection('tournamentParticipations')
+      .where('seasonId', '==', seasonId)
+      .get();
+
+    const participations = participationsSnapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }) as TournamentParticipation)
+      .filter(
+        (p) =>
+          completedTournamentIds.includes(p.tournamentId) &&
+          p.ratingPointsEarned !== null,
+      );
+
+    // Get player info for all participants
+    const playerIds = [...new Set(participations.map((p) => p.playerId))];
+    const playersMap = new Map<
+      string,
+      { firstName: string; lastName: string; isActive: boolean }
+    >();
+
+    for (const playerId of playerIds) {
+      const playerDoc = await this.firestore.doc('players', playerId).get();
+      if (playerDoc.exists) {
+        const playerData = playerDoc.data();
+        playersMap.set(playerId, {
+          firstName: playerData?.firstName || '',
+          lastName: playerData?.lastName || '',
+          isActive: playerData?.isActive ?? true,
+        });
+      }
+    }
 
     // Aggregate rating points by player
     const playerRatings = new Map<
       string,
       {
-        player: any;
+        player: { id: string; firstName: string; lastName: string; isActive: boolean };
         totalPoints: number;
         tournamentsPlayed: number;
         totalPosition: number;
@@ -390,12 +502,20 @@ export class SeasonsService {
     >();
 
     participations.forEach((participation) => {
-      const playerId = participation.player.id;
+      const playerId = participation.playerId;
       const points = participation.ratingPointsEarned || 0;
+      const playerInfo = playersMap.get(playerId);
+
+      if (!playerInfo) return;
 
       if (!playerRatings.has(playerId)) {
         playerRatings.set(playerId, {
-          player: participation.player,
+          player: {
+            id: playerId,
+            firstName: playerInfo.firstName,
+            lastName: playerInfo.lastName,
+            isActive: playerInfo.isActive,
+          },
           totalPoints: 0,
           tournamentsPlayed: 0,
           totalPosition: 0,
@@ -416,11 +536,9 @@ export class SeasonsService {
         playerData.positionCount += 1;
       }
 
-      // Track game scores for average calculation (only count games that were actually played)
+      // Track game scores for average calculation
       if (participation.gameScores && Array.isArray(participation.gameScores)) {
-        const gameScores = participation.gameScores as number[];
-        gameScores.forEach((score) => {
-          // Only count games with a score greater than 0 (game was actually played)
+        participation.gameScores.forEach((score) => {
           if (typeof score === 'number' && !isNaN(score) && score > 0) {
             playerData.totalGameScore += score;
             playerData.totalGamesPlayed += 1;
@@ -429,9 +547,9 @@ export class SeasonsService {
       }
 
       playerData.tournaments.push({
-        tournamentId: participation.tournament.id,
-        tournamentName: participation.tournament.name,
-        date: participation.tournament.date.toISOString(),
+        tournamentId: participation.tournamentId,
+        tournamentName: participation.tournamentName,
+        date: this.firestore.fromTimestamp(participation.tournamentDate)?.toISOString() || '',
         position: participation.finalPosition,
         points,
       });
@@ -439,15 +557,21 @@ export class SeasonsService {
 
     // Convert to array and sort by total points (descending)
     const leaderboard = Array.from(playerRatings.values())
-      .map((data, index) => ({
-        rank: index + 1, // Will be recalculated after sorting
+      .map((data) => ({
+        rank: 0,
         playerId: data.player.id,
         playerName: `${data.player.firstName} ${data.player.lastName}`,
         isActive: data.player.isActive,
         totalPoints: data.totalPoints,
         tournamentsPlayed: data.tournamentsPlayed,
-        averagePoints: data.tournamentsPlayed > 0 ? data.totalPoints / data.tournamentsPlayed : 0,
-        averagePosition: data.totalGamesPlayed > 0 ? data.totalGameScore / data.totalGamesPlayed : 0,
+        averagePoints:
+          data.tournamentsPlayed > 0
+            ? data.totalPoints / data.tournamentsPlayed
+            : 0,
+        averagePosition:
+          data.totalGamesPlayed > 0
+            ? data.totalGameScore / data.totalGamesPlayed
+            : 0,
         tournaments: data.tournaments,
       }))
       .sort((a, b) => b.totalPoints - a.totalPoints)

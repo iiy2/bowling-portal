@@ -1,84 +1,178 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { FirestoreService } from '../firestore/firestore.service';
+import { CascadeService } from '../firestore/cascade.service';
 import { CreatePlayerDto } from './dto/create-player.dto';
 import { UpdatePlayerDto } from './dto/update-player.dto';
 import { PlayerQueryDto } from './dto/player-query.dto';
-import { UserRole } from '@prisma/client';
+
+interface Player {
+  id: string;
+  userId: string | null;
+  firstName: string;
+  lastName: string;
+  firstNameLower: string;
+  lastNameLower: string;
+  email: string | null;
+  emailLower: string | null;
+  phone: string | null;
+  registrationDate: FirebaseFirestore.Timestamp;
+  isActive: boolean;
+  createdAt: FirebaseFirestore.Timestamp;
+  updatedAt: FirebaseFirestore.Timestamp;
+  overallStats?: {
+    averageScore: number;
+    highestScore: number;
+    totalTournamentsPlayed: number;
+    totalRatingPoints: number;
+  };
+}
+
+export interface User {
+  id: string;
+  email: string;
+  role: string;
+}
+
+type UserRole = 'ADMIN' | 'REGULAR';
 
 @Injectable()
 export class PlayersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private firestore: FirestoreService,
+    private cascadeService: CascadeService,
+  ) {}
 
-  async create(createPlayerDto: CreatePlayerDto, userId: string, userRole: UserRole) {
+  async create(
+    createPlayerDto: CreatePlayerDto,
+    userId: string,
+    userRole: UserRole,
+  ) {
     // Regular users: automatically assign player to themselves
-    // Admin users: can leave userId null (unassigned player) or create for themselves
-    const finalUserId = userRole === UserRole.ADMIN ? null : userId;
+    // Admin users: can leave userId null (unassigned player)
+    const finalUserId = userRole === 'ADMIN' ? null : userId;
 
-    return this.prisma.player.create({
-      data: {
-        ...createPlayerDto,
-        userId: finalUserId,
+    const playerId = this.firestore.generateId();
+    const playerData = {
+      id: playerId,
+      ...createPlayerDto,
+      firstNameLower: createPlayerDto.firstName.toLowerCase(),
+      lastNameLower: createPlayerDto.lastName.toLowerCase(),
+      emailLower: createPlayerDto.email?.toLowerCase() || null,
+      userId: finalUserId,
+      isActive: createPlayerDto.isActive ?? true,
+      registrationDate: this.firestore.serverTimestamp(),
+      createdAt: this.firestore.serverTimestamp(),
+      updatedAt: this.firestore.serverTimestamp(),
+      overallStats: {
+        averageScore: 0,
+        highestScore: 0,
+        totalTournamentsPlayed: 0,
+        totalRatingPoints: 0,
       },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            role: true,
-          },
-        },
-      },
-    });
+    };
+
+    await this.firestore.doc('players', playerId).set(playerData);
+
+    // Get user info if assigned
+    let user: User | null = null;
+    if (finalUserId) {
+      const userDoc = await this.firestore.doc('users', finalUserId).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        user = {
+          id: userDoc.id,
+          email: userData?.email,
+          role: userData?.role,
+        };
+      }
+    }
+
+    return {
+      ...playerData,
+      registrationDate: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      user,
+    };
   }
 
   async findAll(query: PlayerQueryDto) {
     const { search, isActive, page = 1, limit = 10 } = query;
-    const skip = (page - 1) * limit;
 
-    const where: any = {};
+    let firestoreQuery = this.firestore.collection('players').orderBy('lastName');
 
-    if (search) {
-      where.OR = [
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { email: { contains: search, mode: 'insensitive' } },
-      ];
-    }
-
+    // Apply isActive filter if specified
     if (isActive !== undefined) {
-      where.isActive = isActive;
+      firestoreQuery = firestoreQuery.where('isActive', '==', isActive) as any;
     }
 
-    const [players, total] = await Promise.all([
-      this.prisma.player.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { lastName: 'asc' },
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              role: true,
-            },
-          },
-          statistics: {
-            where: { seasonId: null }, // Overall statistics
-            select: {
-              averageScore: true,
-              highestScore: true,
-              totalTournamentsPlayed: true,
-              totalRatingPoints: true,
-            },
-          },
-        },
+    // Get all matching documents (we'll filter search in memory for case-insensitive)
+    const snapshot = await firestoreQuery.get();
+    let players = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as (Player & { id: string })[];
+
+    // Apply search filter in memory (case-insensitive)
+    if (search) {
+      const searchLower = search.toLowerCase();
+      players = players.filter(
+        (p) =>
+          p.firstNameLower?.includes(searchLower) ||
+          p.lastNameLower?.includes(searchLower) ||
+          p.emailLower?.includes(searchLower),
+      );
+    }
+
+    const total = players.length;
+
+    // Apply pagination
+    const skip = (page - 1) * limit;
+    const paginatedPlayers = players.slice(skip, skip + limit);
+
+    // Fetch user info for players with userId
+    const playersWithUser = await Promise.all(
+      paginatedPlayers.map(async (player) => {
+        let user: User | null = null;
+        if (player.userId) {
+          const userDoc = await this.firestore.doc('users', player.userId).get();
+          if (userDoc.exists) {
+            const userData = userDoc.data();
+            user = {
+              id: userDoc.id,
+              email: userData?.email,
+              role: userData?.role,
+            };
+          }
+        }
+
+        // Format statistics from overallStats
+        const statistics = player.overallStats
+          ? [
+              {
+                averageScore: player.overallStats.averageScore,
+                highestScore: player.overallStats.highestScore,
+                totalTournamentsPlayed: player.overallStats.totalTournamentsPlayed,
+                totalRatingPoints: player.overallStats.totalRatingPoints,
+              },
+            ]
+          : [];
+
+        return {
+          ...player,
+          registrationDate: this.firestore.fromTimestamp(
+            player.registrationDate as any,
+          ),
+          createdAt: this.firestore.fromTimestamp(player.createdAt as any),
+          updatedAt: this.firestore.fromTimestamp(player.updatedAt as any),
+          user,
+          statistics,
+        };
       }),
-      this.prisma.player.count({ where }),
-    ]);
+    );
 
     return {
-      data: players,
+      data: playersWithUser,
       meta: {
         total,
         page,
@@ -89,121 +183,215 @@ export class PlayersService {
   }
 
   async findOne(id: string) {
-    const player = await this.prisma.player.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            role: true,
-          },
-        },
-        statistics: {
-          select: {
-            id: true,
-            seasonId: true,
-            averageScore: true,
-            highestScore: true,
-            totalTournamentsPlayed: true,
-            totalRatingPoints: true,
-            season: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-        participations: {
-          take: 10,
-          orderBy: {
-            tournament: {
-              date: 'desc',
-            },
-          },
-          include: {
-            tournament: {
-              select: {
-                id: true,
-                name: true,
-                date: true,
-                status: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    const playerDoc = await this.firestore.doc('players', id).get();
 
-    if (!player) {
+    if (!playerDoc.exists) {
       throw new NotFoundException(`Player with ID ${id} not found`);
     }
 
-    return player;
+    const player = { id: playerDoc.id, ...playerDoc.data() } as Player;
+
+    // Get user info
+    let user: User | null = null;
+    if (player.userId) {
+      const userDoc = await this.firestore.doc('users', player.userId).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        user = {
+          id: userDoc.id,
+          email: userData?.email,
+          role: userData?.role,
+        };
+      }
+    }
+
+    // Get statistics for this player
+    const statsSnapshot = await this.firestore
+      .collection('playerStatistics')
+      .where('playerId', '==', id)
+      .get();
+
+    const statistics = await Promise.all(
+      statsSnapshot.docs.map(async (doc) => {
+        const statData = doc.data();
+        let season: { id: string; name: string } | null = null;
+        if (statData.seasonId) {
+          const seasonDoc = await this.firestore
+            .doc('seasons', statData.seasonId)
+            .get();
+          if (seasonDoc.exists) {
+            const seasonData = seasonDoc.data();
+            season = {
+              id: seasonDoc.id,
+              name: seasonData?.name,
+            };
+          }
+        }
+        return {
+          id: doc.id,
+          seasonId: statData.seasonId,
+          averageScore: statData.averageScore,
+          highestScore: statData.highestScore,
+          totalTournamentsPlayed: statData.totalTournamentsPlayed,
+          totalRatingPoints: statData.totalRatingPoints,
+          season,
+        };
+      }),
+    );
+
+    // Get recent participations
+    const participationsSnapshot = await this.firestore
+      .collection('tournamentParticipations')
+      .where('playerId', '==', id)
+      .orderBy('tournamentDate', 'desc')
+      .limit(10)
+      .get();
+
+    const participations = participationsSnapshot.docs.map((doc) => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        tournamentId: data.tournamentId,
+        handicap: data.handicap,
+        gameScores: data.gameScores,
+        totalScore: data.totalScore,
+        finalsScores: data.finalsScores,
+        finalPosition: data.finalPosition,
+        ratingPointsEarned: data.ratingPointsEarned,
+        tournament: {
+          id: data.tournamentId,
+          name: data.tournamentName,
+          date: this.firestore.fromTimestamp(data.tournamentDate),
+          status: data.tournamentStatus || 'COMPLETED',
+        },
+      };
+    });
+
+    return {
+      ...player,
+      registrationDate: this.firestore.fromTimestamp(
+        player.registrationDate as any,
+      ),
+      createdAt: this.firestore.fromTimestamp(player.createdAt as any),
+      updatedAt: this.firestore.fromTimestamp(player.updatedAt as any),
+      user,
+      statistics,
+      participations,
+    };
   }
 
   async update(id: string, updatePlayerDto: UpdatePlayerDto) {
-    const player = await this.prisma.player.findUnique({
-      where: { id },
-    });
+    const playerDoc = await this.firestore.doc('players', id).get();
 
-    if (!player) {
+    if (!playerDoc.exists) {
       throw new NotFoundException(`Player with ID ${id} not found`);
     }
 
-    return this.prisma.player.update({
-      where: { id },
-      data: updatePlayerDto,
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            role: true,
-          },
-        },
-      },
-    });
+    const player = playerDoc.data() as Player;
+
+    const updateData: any = {
+      ...updatePlayerDto,
+      updatedAt: this.firestore.serverTimestamp(),
+    };
+
+    // Update lowercase fields if name/email changed
+    if (updatePlayerDto.firstName) {
+      updateData.firstNameLower = updatePlayerDto.firstName.toLowerCase();
+    }
+    if (updatePlayerDto.lastName) {
+      updateData.lastNameLower = updatePlayerDto.lastName.toLowerCase();
+    }
+    if (updatePlayerDto.email !== undefined) {
+      updateData.emailLower = updatePlayerDto.email?.toLowerCase() || null;
+    }
+
+    await this.firestore.doc('players', id).update(updateData);
+
+    // Update denormalized names if name changed
+    if (updatePlayerDto.firstName || updatePlayerDto.lastName) {
+      const newFirstName = updatePlayerDto.firstName || player.firstName;
+      const newLastName = updatePlayerDto.lastName || player.lastName;
+      await this.cascadeService.updatePlayerNameDenormalized(
+        id,
+        newFirstName,
+        newLastName,
+      );
+    }
+
+    // Get updated player
+    const updatedPlayerDoc = await this.firestore.doc('players', id).get();
+    const updatedPlayer = {
+      id: updatedPlayerDoc.id,
+      ...updatedPlayerDoc.data(),
+    } as Player;
+
+    // Get user info
+    let user: User | null = null;
+    if (updatedPlayer.userId) {
+      const userDoc = await this.firestore
+        .doc('users', updatedPlayer.userId)
+        .get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        user = {
+          id: userDoc.id,
+          email: userData?.email,
+          role: userData?.role,
+        };
+      }
+    }
+
+    return {
+      ...updatedPlayer,
+      registrationDate: this.firestore.fromTimestamp(
+        updatedPlayer.registrationDate as any,
+      ),
+      createdAt: this.firestore.fromTimestamp(updatedPlayer.createdAt as any),
+      updatedAt: this.firestore.fromTimestamp(updatedPlayer.updatedAt as any),
+      user,
+    };
   }
 
   async remove(id: string) {
-    const player = await this.prisma.player.findUnique({
-      where: { id },
-    });
+    const playerDoc = await this.firestore.doc('players', id).get();
 
-    if (!player) {
+    if (!playerDoc.exists) {
       throw new NotFoundException(`Player with ID ${id} not found`);
     }
 
-    await this.prisma.player.delete({
-      where: { id },
-    });
+    const player = playerDoc.data() as Player;
+
+    // Use cascade service to delete player and related data
+    await this.cascadeService.deletePlayerCascade(id, player.userId);
 
     return { message: 'Player deleted successfully' };
   }
 
   async getSuggestions(query: string, limit: number = 10) {
-    return this.prisma.player.findMany({
-      where: {
-        AND: [
-          { isActive: true },
-          {
-            OR: [
-              { firstName: { contains: query, mode: 'insensitive' } },
-              { lastName: { contains: query, mode: 'insensitive' } },
-            ],
-          },
-        ],
-      },
-      take: limit,
-      orderBy: { lastName: 'asc' },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-      },
-    });
+    const queryLower = query.toLowerCase();
+
+    // Get active players
+    const snapshot = await this.firestore
+      .collection('players')
+      .where('isActive', '==', true)
+      .orderBy('lastName')
+      .get();
+
+    // Filter by name match in memory
+    const matchingPlayers = snapshot.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }) as Player)
+      .filter(
+        (p) =>
+          p.firstNameLower?.includes(queryLower) ||
+          p.lastNameLower?.includes(queryLower),
+      )
+      .slice(0, limit);
+
+    return matchingPlayers.map((p) => ({
+      id: p.id,
+      firstName: p.firstName,
+      lastName: p.lastName,
+      email: p.email,
+    }));
   }
 }

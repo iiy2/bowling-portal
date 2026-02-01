@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
-import { PrismaService } from '../../prisma/prisma.service';
+import { FirestoreService } from '../../firestore/firestore.service';
 
 export interface JwtPayload {
   sub: string;
@@ -10,11 +10,19 @@ export interface JwtPayload {
   role: string;
 }
 
+interface User {
+  id: string;
+  email: string;
+  role: string;
+  languagePreference: string;
+  themePreference: string;
+}
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     private configService: ConfigService,
-    private prisma: PrismaService,
+    private firestore: FirestoreService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -24,16 +32,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: payload.sub },
-    });
+    const userDoc = await this.firestore.doc('users', payload.sub).get();
 
-    if (!user) {
+    if (!userDoc.exists) {
       throw new UnauthorizedException();
     }
 
+    const user = userDoc.data() as User;
+
     return {
-      id: user.id,
+      id: userDoc.id,
       email: user.email,
       role: user.role,
       languagePreference: user.languagePreference,

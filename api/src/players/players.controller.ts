@@ -18,7 +18,7 @@ import { PlayerQueryDto } from './dto/player-query.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../common/types/user-role';
 
 @ApiTags('players')
 @Controller('players')
@@ -28,9 +28,16 @@ export class PlayersController {
   @Post()
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new player (authenticated users can create players for themselves)' })
+  @ApiOperation({
+    summary:
+      'Create a new player (authenticated users can create players for themselves)',
+  })
   create(@Body() createPlayerDto: CreatePlayerDto, @Request() req: any) {
-    return this.playersService.create(createPlayerDto, req.user.userId, req.user.role);
+    return this.playersService.create(
+      createPlayerDto,
+      req.user.userId,
+      req.user.role,
+    );
   }
 
   @Get()

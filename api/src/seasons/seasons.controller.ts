@@ -16,7 +16,7 @@ import { UpdateRatingConfigDto } from './dto/update-rating-config.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../common/types/user-role';
 
 @ApiTags('seasons')
 @Controller('seasons')
@@ -90,7 +90,9 @@ export class SeasonsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update rating configuration for a season (Admin only)' })
+  @ApiOperation({
+    summary: 'Update rating configuration for a season (Admin only)',
+  })
   updateRatingConfig(
     @Param('id') id: string,
     @Body() updateRatingConfigDto: UpdateRatingConfigDto,

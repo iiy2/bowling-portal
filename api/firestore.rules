@@ -1,0 +1,14 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // All access is through Firebase Functions (server-side)
+    // These rules deny direct client access for security
+    // The API handles all authentication and authorization
+
+    match /{document=**} {
+      // Deny all direct client access
+      // All operations go through Firebase Functions with admin SDK
+      allow read, write: if false;
+    }
+  }
+}

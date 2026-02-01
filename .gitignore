@@ -49,6 +49,14 @@ bowling-league-api/generated/
 .cache/
 .temp/
 tmp/
+
+# Firebase
+.firebase/
+.firebaserc
+firebase-debug.log
+firebase-debug.*.log
+.runtimeconfig.json
+
 PHASE2_COMPLETE.md
 PHASE3_COMPLETE.md
 PHASE4_COMPLETE.md

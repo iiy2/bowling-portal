@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsDateString, IsBoolean, IsOptional, IsObject } from 'class-validator';
+import {
+  IsString,
+  IsDateString,
+  IsBoolean,
+  IsOptional,
+  IsObject,
+} from 'class-validator';
 
 export class CreateSeasonDto {
   @ApiProperty({ example: 'Spring 2025' })
